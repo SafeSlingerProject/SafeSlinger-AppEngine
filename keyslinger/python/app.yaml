@@ -1,0 +1,53 @@
+application: keyslinger-server
+version: 01060000t
+runtime: python
+api_version: 1
+
+handlers:
+
+- url: /assignUser
+  script: assignUser.py
+  secure: always
+
+- url: /syncUsers
+  script: syncUsers.py
+  secure: always
+
+- url: /syncData
+  script: syncData.py
+  secure: always
+
+- url: /syncSignatures
+  script: syncSignatures.py
+  secure: always
+  
+- url: /syncUsers_1_2
+  script: syncUsers_1_2.py
+  secure: always
+
+- url: /syncData_1_2
+  script: syncData_1_2.py
+  secure: always
+
+- url: /syncSignatures_1_2
+  script: syncSignatures_1_2.py
+  secure: always
+  
+- url: /syncKeyNodes_1_3
+  script: syncKeyNodes_1_3.py
+  secure: always
+  
+- url: /syncMatch_1_2
+  script: syncMatch_1_2.py
+  secure: always
+  
+- url: /cron/cleanup
+  script: cleanup.py
+
+- url: /favicon\.ico
+  static_files: static/images/favicon.ico
+  upload: static/images/favicon\.ico
+  
+- url: /.*
+  script: main.py
+  secure: always

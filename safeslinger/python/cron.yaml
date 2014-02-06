@@ -1,0 +1,5 @@
+cron:
+- description: Cleanup stale entries.
+  url: /cron/cleanup
+  schedule: every 1 minutes
+  

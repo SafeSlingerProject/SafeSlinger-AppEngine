@@ -1,0 +1,53 @@
+application: starsling-server
+version: 01060000t
+runtime: python
+api_version: 1
+
+handlers:
+- url: /admin
+  script: authService.py
+  secure: always
+  
+- url: /c2dmLogin
+  script: authService.py
+  secure: always
+  
+- url: /airshipLogin
+  script: authService.py
+  secure: always
+  
+- url: /postFile1
+  script: postFile1.py
+  secure: always
+  
+- url: /postFile2
+  script: postFile2.py
+  secure: always
+
+- url: /getFile
+  script: getFile.py
+  secure: always
+
+- url: /getMessage
+  script: getMessage.py
+  secure: always
+
+- url: /getMessageNoncesByToken
+  script: getMessageNoncesByToken.py
+  secure: always
+
+- url: /cron/cleanup
+  script: cleanup.py
+  
+- url: /checkStatus
+  script: checkStatus.py
+  secure: always
+  
+- url: /favicon\.ico
+  static_files: static/images/favicon.ico
+  upload: static/images/favicon\.ico
+
+- url: /.*
+  script: main.py
+  secure: always
+  

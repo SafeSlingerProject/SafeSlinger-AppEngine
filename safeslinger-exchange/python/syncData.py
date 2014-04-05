@@ -163,8 +163,10 @@ class SyncData(webapp.RequestHandler):
 
 
 def main():
-    application = webapp.WSGIApplication([('/syncData_1_2', SyncData)],
-                                         debug=True)
+    application = webapp.WSGIApplication([('/syncData', SyncData),
+                                      ('/syncData_1_2', SyncData),
+                                     ],
+                                     debug=True)
     util.run_wsgi_app(application)
 
 

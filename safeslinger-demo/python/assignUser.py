@@ -141,8 +141,9 @@ class AssignUser(webapp.RequestHandler):
     
 
 def main():
-    application = webapp.WSGIApplication([('/assignUser', AssignUser)],
-                                         debug=True)
+    application = webapp.WSGIApplication([('/assignUser', AssignUser),
+                                     ],
+                                     debug=True)
     util.run_wsgi_app(application)
 
 

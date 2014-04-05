@@ -135,8 +135,9 @@ class SyncKeyNodes(webapp.RequestHandler):
 
 
 def main():
-    application = webapp.WSGIApplication([('/syncKeyNodes_1_3', SyncKeyNodes)],
-                                         debug=True)
+    application = webapp.WSGIApplication([('/syncKeyNodes', SyncKeyNodes),
+                                     ],
+                                     debug=True)
     util.run_wsgi_app(application)
 
 

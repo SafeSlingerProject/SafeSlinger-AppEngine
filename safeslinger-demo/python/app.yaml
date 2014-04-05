@@ -1,0 +1,37 @@
+application: slinger-demo
+version: 01060000t
+runtime: python
+api_version: 1
+
+handlers:
+
+- url: /assignUser
+  script: assignUser.py
+  secure: always
+
+- url: /syncUsers
+  script: syncUsers.py
+  secure: always
+
+- url: /syncData
+  script: syncData.py
+  secure: always
+
+- url: /syncSignatures
+  script: syncSignatures.py
+  secure: always
+  
+- url: /syncKeyNodes
+  script: syncKeyNodes.py
+  secure: always
+  
+- url: /syncMatch
+  script: syncMatch.py
+  secure: always
+  
+- url: /cron/cleanup
+  script: cleanup.py
+
+- url: /.*
+  script: main.py
+  secure: always

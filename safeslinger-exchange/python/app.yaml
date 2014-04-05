@@ -13,7 +13,15 @@ handlers:
   script: syncUsers.py
   secure: always
 
+- url: /syncUsers_1_2
+  script: syncUsers.py
+  secure: always
+
 - url: /syncData
+  script: syncData.py
+  secure: always
+
+- url: /syncData_1_2
   script: syncData.py
   secure: always
 
@@ -21,24 +29,24 @@ handlers:
   script: syncSignatures.py
   secure: always
   
-- url: /syncUsers_1_2
-  script: syncUsers_1_2.py
-  secure: always
-
-- url: /syncData_1_2
-  script: syncData_1_2.py
-  secure: always
-
 - url: /syncSignatures_1_2
-  script: syncSignatures_1_2.py
+  script: syncSignatures.py
+  secure: always
+  
+- url: /syncKeyNodes
+  script: syncKeyNodes.py
   secure: always
   
 - url: /syncKeyNodes_1_3
-  script: syncKeyNodes_1_3.py
+  script: syncKeyNodes.py
+  secure: always
+  
+- url: /syncMatch
+  script: syncMatch.py
   secure: always
   
 - url: /syncMatch_1_2
-  script: syncMatch_1_2.py
+  script: syncMatch.py
   secure: always
   
 - url: /cron/cleanup

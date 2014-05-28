@@ -1,4 +1,4 @@
 cron:
-- description: Cleanup stale entries.
+- description: Cleanup stale safeslinger sling keys entries.
   url: /cron/cleanup
-  schedule: every 1 minutes
+  schedule: every 5 minutes

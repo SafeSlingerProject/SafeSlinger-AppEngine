@@ -1,5 +1,5 @@
 cron:
-- description: Cleanup stale entries.
+- description: Cleanup stale safeslinger messages.
   url: /cron/cleanup
-  schedule: every 1 minutes
+  schedule: every 1 hours
   

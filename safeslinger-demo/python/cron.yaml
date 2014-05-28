@@ -1,0 +1,4 @@
+cron:
+- description: Cleanup stale demo key entries.
+  url: /cron/cleanup
+  schedule: every 5 minutes

@@ -17,11 +17,15 @@ handlers:
   secure: always
   
 - url: /postFile1
-  script: postFile1.py
+  script: postMessage.py
   secure: always
   
 - url: /postFile2
-  script: postFile2.py
+  script: postMessage.py
+  secure: always
+  
+- url: /postMessage
+  script: postMessage.py
   secure: always
 
 - url: /getFile

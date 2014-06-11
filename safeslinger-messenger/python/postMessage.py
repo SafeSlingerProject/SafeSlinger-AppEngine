@@ -27,16 +27,19 @@ import logging
 import os
 import struct
 
-from google.appengine.api import files
+from google.appengine.api import files, urlfetch
+from google.appengine.api.urlfetch_errors import DeadlineExceededError
 from google.appengine.ext import webapp
 from google.appengine.ext.webapp import util
 
+import airshipAuthToken
 import c2dm
 import c2dmAuthToken
+from django.utils import simplejson
 import filestorage
 
 
-class PostFile(webapp.RequestHandler):
+class PostMessage(webapp.RequestHandler):
 
     def post(self): 
         minlen = 4 + 4 + 20 + 4 + 1 + 4 + 1        
@@ -106,6 +109,15 @@ class PostFile(webapp.RequestHandler):
         pos = pos + 4
         fileData = data[pos:(pos + lenfd)]
         pos = pos + lenfd
+
+        # add notify type generically in 1.7 for backward-compatibility
+        if len(data) >= (pos + 4):
+            devtype = (struct.unpack("!i", data[pos:(pos + 4)]))[0]
+        else:
+            if lenrtok <= 64:
+                devtype = 2  # apns was shorter
+            else:
+                devtype = 1  # c2dm were longer
                       
         # FILE STORAGE ===============================================================================
         if lenfd > 0:
@@ -143,33 +155,101 @@ class PostFile(webapp.RequestHandler):
             self.resp_simple(0, 'Unable to create new message.')
             return       
 
+        # BEGIN NOTIFY TYPES ===============================================================================
+
+        if devtype == 0:
+            self.resp_simple(0, 'User has no push registration id.')
+            return
+
         # ANDROID PUSH MSG ===============================================================================
-        
-        # send push message to Android service...
-        sender = c2dm.C2DM()
-        sender.registrationId = recipientToken
-        sender.collapseKey = retrievalId
-        sender.fileid = retrievalId
-        
-        # grab latest auth token from our cache
-        query = c2dmAuthToken.C2dmAuthToken.all().order('-inserted')
-        items = query.fetch(1)  # only want the latest
-        num = 0
-        for token in items:
-            sender.clientAuth = token.token
-            num = num + 1
+        elif devtype == 1: 
+            # send push message to Android service...
+            sender = c2dm.C2DM()
+            sender.registrationId = recipientToken
+            sender.collapseKey = retrievalId
+            sender.fileid = retrievalId
+            
+            # grab latest auth token from our cache
+            query = c2dmAuthToken.C2dmAuthToken.all().order('-inserted')
+            items = query.fetch(1)  # only want the latest
+            num = 0
+            for token in items:
+                sender.clientAuth = token.token
+                num = num + 1
+    
+            if num != 1:
+                logging.error('One C2DM authorization token expected, %i found.' % num)
+                self.resp_simple(0, 'Error=PushNotificationFail')
+                return
+    
+            respMessage = sender.sendMessage()
+            
+            if respMessage.find('Error') != -1:
+                self.resp_simple(0, (' %s') % respMessage)
+                return
 
-        if num != 1:
-            logging.error('One C2DM authorization token expected, %i found.' % num)
-            self.resp_simple(0, 'Error=PushNotificationFail')
+        # APPLE PUSH MSG ===============================================================================
+        elif devtype == 2: 
+            # grab latest proper auth token from our cache
+            query = airshipAuthToken.AirshipAuthToken.all()
+            if isProd:
+                query.filter('lookuptag =', 'production')
+            else:
+                query.filter('lookuptag =', 'test')
+    
+            items = query.fetch(1)  # only want the latest
+            num = 0
+            for token in items:
+                # Application Key/Secret from UrbanAirship -> App Menu -> App Details to Display
+                UA_API_APPLICATION_KEY = token.appkey 
+                UA_API_APPLICATION_MASTER_SECRET = token.appsecret
+                num = num + 1
+                
+            url = 'https://go.urbanairship.com/api/push/'
+            auth_string = 'Basic ' + base64.encodestring('%s:%s' % (UA_API_APPLICATION_KEY, UA_API_APPLICATION_MASTER_SECRET))[:-1]
+    
+            logging.info("retrievalId: " + retrievalId)
+            logging.info("recipientToken: " + recipientToken)
+    
+            body = simplejson.dumps({"aps": {"badge": "+1", "alert" : { "loc-key" : "title_NotifyFileAvailable" }, "nonce": retrievalId, "sound": "default"}, "device_tokens": [recipientToken]})
+            
+            # attempt to send push message, using exponential backoff timeout
+            timeout_sec = 2
+            timeout_tot = 0
+            url_retry = True
+            while url_retry and timeout_tot < 60:
+                try:
+                    timeout_tot += timeout_sec
+                    ua_data = urlfetch.fetch(url, headers={'content-type': 'application/json', 'authorization' : auth_string}, payload=body, method=urlfetch.POST, deadline=timeout_sec)
+                    url_retry = False
+                except DeadlineExceededError:
+                    logging.info("DeadlineExceededError - timeout: " + str(timeout_sec) + ", url: " + url)
+                    timeout_sec *= 2
+            # received no status, and our retries have exceeded the timeout
+            if url_retry:
+                self.resp_simple(0, 'Error=PushServiceFail')
+                return
+            # received status from fetch, handle appropriately
+            if ua_data.status_code == 200:
+                logging.info("Remote Notification successfully sent to UrbanAirship " + str(ua_data.status_code) + " " + str(ua_data.content))
+            elif ua_data.status_code == 500:
+                logging.error("Error: 500, Internal Server Error or Urban Service Unavailable. Our system failed. If this persists, contact support..")
+                self.resp_simple(0, 'Error=PushServiceFail')
+                return
+            else:
+                logging.error("UrbanAirship Error: ." + str(ua_data.status_code))
+                self.resp_simple(0, 'Error=PushNotificationFail')
+                return
+            
+            respMessage = struct.pack('!i', ua_data.status_code)
+
+        # NOT IMPLEMENTED PUSH TYPE ===============================================================================
+        else: 
+            self.resp_simple(0, ('Sending to device type %i not yet implemented.' % devtype))
             return
 
-        respMessage = sender.sendMessage()
+        # END NOTIFY TYPES ===============================================================================
         
-        if respMessage.find('Error') != -1:
-            self.resp_simple(0, (' %s') % respMessage)
-            return
-
         # SUCCESS RESPONSE ===============================================================================
         # file inserted and message sent
         self.response.out.write('%s' % struct.pack('!i', server))
@@ -181,7 +261,9 @@ class PostFile(webapp.RequestHandler):
 
 
 def main():
-    application = webapp.WSGIApplication([('/postFile1', PostFile)],
+    application = webapp.WSGIApplication([('/postMessage', PostMessage),
+                                          ('/postFile1', PostMessage),
+                                          ('/postFile2', PostMessage)],
                                          debug=True)
     util.run_wsgi_app(application)
 

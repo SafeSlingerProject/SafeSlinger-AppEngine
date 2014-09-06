@@ -24,7 +24,7 @@ Build Your Own Secure Exchange Server
 ========
 To build your own secure exchange server using App Engine:
 
-1. First, go to the Google App Engine [Create Application](http://appengine.google.com/start/createapp) pages to create a new server app. Under 'Application Identifier' use your own identifier: **________.appspot.com**. Do **NOT** use myappengine.appspot.com or slinger-demo.appspot.com, as they are both taken.
+1. First, go to the Google App Engine [Create Application](http://appengine.google.com/start/createapp) pages to create a new server app. Under 'Application Identifier' use your own identifier: **________.appspot.com**. Do **NOT** use myappengine.appspot.com or slinger-dev.appspot.com, as they are both taken.
 3. Under 'Application Title' use the name of your own application.
 4. Under 'Authentication Options (Advanced)' choose **Open to all Google Accounts users**.
 5. Under 'Storage Options (Advanced)' choose **Master/Slave**. While this option has been deprecated, in favor of High Replication, the server source code exchange still relies on immediate concurrency. When the server source is upgraded to work well using eventual concurrency, this option can change to the recommended High Replication option.

@@ -1,4 +1,4 @@
-application: slinger-demo
+application: slinger-dev
 version: 01060000t
 runtime: python
 api_version: 1

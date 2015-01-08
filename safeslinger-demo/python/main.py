@@ -27,6 +27,8 @@ from google.appengine.ext.webapp import util
 class MainHandler(webapp.RequestHandler):
    
     def get(self):
+        self.response.headers.add_header("Access-Control-Allow-Origin", "*")
+ 
         self.response.out.write('<html><body>')
 
 def main():

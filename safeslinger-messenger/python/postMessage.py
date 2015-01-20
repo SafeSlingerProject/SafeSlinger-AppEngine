@@ -26,6 +26,7 @@ import base64
 import logging
 import os
 import struct
+import time
 
 from google.appengine.api import files, urlfetch
 from google.appengine.api.urlfetch_errors import DeadlineExceededError
@@ -37,12 +38,13 @@ import c2dm
 import c2dmAuthToken
 from django.utils import simplejson
 import filestorage
+import registration
 
 
 class PostMessage(webapp.RequestHandler):
 
     def post(self): 
-        minlen = 4 + 4 + 20 + 4 + 1 + 4 + 1        
+        minlen = 4 + 4 + 20 + 4 + 1 + 4 + 1
         STR_VERSERVER = '01060000'
         INT_VERCLIENT = 0x01060000
         STR_VERCLIENT = '1.6'
@@ -125,7 +127,7 @@ class PostMessage(webapp.RequestHandler):
             # determine which storage method to use....
             if lenfd <= DATASTORE_LIMIT:
                 # add file to data base...
-                file = filestorage.FileStorage(id=retrievalId, data=fileData, msg=msgData, client_ver=client, sender_token=recipientToken)
+                filestore = filestorage.FileStorage(id=retrievalId, data=fileData, msg=msgData, client_ver=client, sender_token=recipientToken)
             else:
                 # Create the file
                 blobName = files.blobstore.create(mime_type='application/octet-stream')        
@@ -144,16 +146,59 @@ class PostMessage(webapp.RequestHandler):
                 blob_key = str(files.blobstore.get_blob_key(blobName)) 
                 # This will only work if the file is less than 10MB. Otherwise, we send a 
                 # correctly encoded multipart form and use the regular blobstore upload method. 
-                file = filestorage.FileStorage(id=retrievalId, blobkey=blob_key, msg=msgData, client_ver=client, sender_token=recipientToken)
+                filestore = filestorage.FileStorage(id=retrievalId, blobkey=blob_key, msg=msgData, client_ver=client, sender_token=recipientToken)
         else:
-            file = filestorage.FileStorage(id=retrievalId, msg=msgData, client_ver=client, sender_token=recipientToken)
+            filestore = filestorage.FileStorage(id=retrievalId, msg=msgData, client_ver=client, sender_token=recipientToken)
         
         # save file retrieval data and keys to datastore
-        file.put()
-        key = file.key()
+        filestore.put()
+        key = filestore.key()
         if not key.has_id_or_name():
             self.resp_simple(0, 'Unable to create new message.')
             return       
+
+        # MESSAGE CONCURRENCY AVAILABILITY ===============================================================================
+        # make sure the message can be retrieved before sending push notification for it.
+        # this is critical to support eventual concurrency, and to prevent mis-classifying live messages as expired.
+        # query for live message, using exponential backoff timeout.
+        msgdata_sec = .25
+        # TODO: adjust period based on deployment testing
+        msgdata_tot = 0
+        data_retry = True
+        while data_retry and msgdata_tot < 32:  # don't wait more than 32 seconds for concurrency
+            query = filestorage.FileStorage.all()
+            query.filter('id =', retrievalId)
+            num = query.count()
+            if num >= 1:
+                data_retry = False
+            elif num == 0:
+                msgdata_tot += msgdata_sec
+                logging.info("Waiting for FileStorage concurrency - timeout: " + str(msgdata_sec))
+                time.sleep(msgdata_sec)
+                msgdata_sec *= 2
+        # data retries have exceeded the timeout
+        if data_retry:
+            # TODO: model if erroring out to the client is best or if we can delay push sending
+            logging.error("Continuing with push after FileStorage concurrency timed out: " + str(msgdata_sec))
+
+        # PUSH REGISTRATION UPDATE ===============================================================================
+        # TODO: this could be structured better to query one data set, rather than 2 queries
+        # make sure the most recent push registration id is used 
+        query = registration.Registration.all().order('-inserted')
+        query.filter('registration_id =', recipientToken)
+        items = query.fetch(1)  # only want the latest        
+        # lookup matching key ids
+        for reg_old in items:
+            query2 = registration.Registration.all().order('-inserted')
+            query2.filter('key_id =', reg_old.key_id)
+            items2 = query2.fetch(1)  # only want the latest        
+            # update registration id and device type if stored already
+            for reg_new in items2:
+                logging.info('Key ID found, using lookup reg %s, not submitted reg %s' % (reg_new.registration_id, recipientToken))
+                recipientToken = reg_new.registration_id
+                devtype = reg_new.notify_type
+
+        # otherwise, just use the submitted registration as is
 
         # BEGIN NOTIFY TYPES ===============================================================================
 
@@ -223,7 +268,7 @@ class PostMessage(webapp.RequestHandler):
                     ua_data = urlfetch.fetch(url, headers={'content-type': 'application/json', 'authorization' : auth_string}, payload=body, method=urlfetch.POST, deadline=timeout_sec)
                     url_retry = False
                 except DeadlineExceededError:
-                    logging.info("DeadlineExceededError - timeout: " + str(timeout_sec) + ", url: " + url)
+                    logging.error("DeadlineExceededError - timeout: " + str(timeout_sec) + ", url: " + url)
                     timeout_sec *= 2
             # received no status, and our retries have exceeded the timeout
             if url_retry:

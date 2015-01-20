@@ -21,7 +21,6 @@
 # THE SOFTWARE.
 
 import cgi
-import datetime
 import os
 
 from google.appengine.api import users

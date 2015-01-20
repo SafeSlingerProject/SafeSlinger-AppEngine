@@ -15,3 +15,20 @@ indexes:
   - name: sender_token
   - name: inserted
     direction: desc
+
+- kind: Registration
+  properties:
+  - name: registration_id
+  - name: inserted
+    direction: desc
+    
+- kind: Registration
+  properties:
+  - name: key_id
+  - name: inserted
+
+- kind: Registration
+  properties:
+  - name: key_id
+  - name: inserted
+    direction: desc

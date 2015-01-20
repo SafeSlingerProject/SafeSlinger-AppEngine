@@ -63,9 +63,8 @@ class C2DM():
                 tokenStore = c2dmAuthToken.C2dmAuthToken(token=response.headers['Update-Client-Auth'], username='Update-Client-Auth', comment='Update-Client-Auth in response')
                 tokenStore.put()
                 key = tokenStore.key()
-                insertSuccess = True
                 if not key.has_id_or_name():
-                    insertSuccess = False
+                    logging.error("C2DM HTTP Error: c2dm token insert failed for " + response.headers['Update-Client-Auth'])
 
             responseAsString = response.read()
             return responseAsString

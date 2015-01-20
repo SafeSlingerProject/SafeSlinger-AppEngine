@@ -77,7 +77,6 @@ class GetFile(webapp.RequestHandler):
             return
 
         server = int(CURRENT_VERSION_ID[0:8], 16)
-        isProd = CURRENT_VERSION_ID[8:9] == 'p'
 
         # unpack all incoming data
         pos = 0
@@ -94,9 +93,9 @@ class GetFile(webapp.RequestHandler):
 
         # if found package up file and return it
         num = 0
-        for file in items:
+        for filestore in items:
 
-            blob_key = file.blobkey
+            blob_key = filestore.blobkey
             if blob_key:
                 # Open the file for reading
                 f = files.open("/blobstore/%s" % blob_key, "r")
@@ -108,7 +107,7 @@ class GetFile(webapp.RequestHandler):
                     newdata = f.read(65536)                
                 f.close()
             else:
-                fileData = file.data
+                fileData = filestore.data
 
             lenfd = str.__len__(fileData)
 

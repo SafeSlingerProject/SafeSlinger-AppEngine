@@ -27,6 +27,10 @@ handlers:
 - url: /postMessage
   script: postMessage.py
   secure: always
+  
+- url: /postRegistration
+  script: postRegistration.py
+  secure: always
 
 - url: /getFile
   script: getFile.py

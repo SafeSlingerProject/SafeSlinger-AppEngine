@@ -76,7 +76,6 @@ class GetMessage(webapp.RequestHandler):
             return
 
         server = int(CURRENT_VERSION_ID[0:8], 16)
-        isProd = CURRENT_VERSION_ID[8:9] == 'p'
 
         # unpack all incoming data
         pos = 0

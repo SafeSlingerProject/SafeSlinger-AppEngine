@@ -1,7 +1,8 @@
-application: starsling-server
+application: safeslinger-messenger
 version: 01060000t
-runtime: python
+runtime: python27
 api_version: 1
+threadsafe: false
 
 handlers:
 - url: /admin

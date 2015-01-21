@@ -36,8 +36,8 @@ from google.appengine.ext.webapp import util
 import airshipAuthToken
 import c2dm
 import c2dmAuthToken
-from django.utils import simplejson
 import filestorage
+import json
 import registration
 
 
@@ -256,7 +256,7 @@ class PostMessage(webapp.RequestHandler):
             logging.info("retrievalId: " + retrievalId)
             logging.info("recipientToken: " + recipientToken)
     
-            body = simplejson.dumps({"aps": {"badge": "+1", "alert" : { "loc-key" : "title_NotifyFileAvailable" }, "nonce": retrievalId, "sound": "default"}, "device_tokens": [recipientToken]})
+            body = json.dumps({"aps": {"badge": "+1", "alert" : { "loc-key" : "title_NotifyFileAvailable" }, "nonce": retrievalId, "sound": "default"}, "device_tokens": [recipientToken]})
             
             # attempt to send push message, using exponential backoff timeout
             timeout_sec = 2

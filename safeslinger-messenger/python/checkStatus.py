@@ -33,7 +33,7 @@ from google.appengine.ext import webapp
 from google.appengine.ext.webapp import util
 
 import airshipAuthToken
-from django.utils import simplejson
+import json
 
 
 class checkStatus(webapp.RequestHandler):
@@ -137,7 +137,7 @@ class checkStatus(webapp.RequestHandler):
                 return
             # received status from fetch, handle appropriately
             if ua_data.status_code == 200:
-                tokenstatus = simplejson.loads(ua_data.content)
+                tokenstatus = json.loads(ua_data.content)
                 if tokenstatus.get('active'):
                     self.response.out.write('%s' % struct.pack('!i', server))
                     self.response.out.write('%s Active status.' % struct.pack('!i', 1))

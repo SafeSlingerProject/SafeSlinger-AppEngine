@@ -30,16 +30,18 @@ import time
 
 from google.appengine.api import files, urlfetch
 from google.appengine.api.urlfetch_errors import DeadlineExceededError
+from google.appengine.runtime import DeadlineExceededError
 from google.appengine.ext import webapp
 from google.appengine.ext.webapp import util
 
-import airshipAuthToken
+import apnsAuthToken
 import c2dm
 import c2dmAuthToken
 import filestorage
 import json
 import registration
-
+import random
+from apns import APNs, APNsConnection, Payload, PayloadAlert
 
 class PostMessage(webapp.RequestHandler):
 
@@ -235,58 +237,80 @@ class PostMessage(webapp.RequestHandler):
 
         # APPLE PUSH MSG ===============================================================================
         elif devtype == 2: 
-            # grab latest proper auth token from our cache
-            query = airshipAuthToken.AirshipAuthToken.all()
+            # grab latest proper credential from our cache
+            query = apnsAuthToken.APNSAuthToken.all()
             if isProd:
-                query.filter('lookuptag =', 'production')
+            	query.filter('lookuptag =', 'production')
             else:
-                query.filter('lookuptag =', 'test')
-    
+            	query.filter('lookuptag =', 'test')
+            	
             items = query.fetch(1)  # only want the latest
             num = 0
-            for token in items:
-                # Application Key/Secret from UrbanAirship -> App Menu -> App Details to Display
-                UA_API_APPLICATION_KEY = token.appkey 
-                UA_API_APPLICATION_MASTER_SECRET = token.appsecret
-                num = num + 1
-                
-            url = 'https://go.urbanairship.com/api/push/'
-            auth_string = 'Basic ' + base64.encodestring('%s:%s' % (UA_API_APPLICATION_KEY, UA_API_APPLICATION_MASTER_SECRET))[:-1]
-    
+            for credentail in items:
+            	APNS_KEY = credentail.apnsKey
+            	APNS_CERT = credentail.apnsCert
+            	num = num + 1
+            
             logging.info("retrievalId: " + retrievalId)
             logging.info("recipientToken: " + recipientToken)
     
             body = json.dumps({"aps": {"badge": "+1", "alert" : { "loc-key" : "title_NotifyFileAvailable" }, "nonce": retrievalId, "sound": "default"}, "device_tokens": [recipientToken]})
             
-            # attempt to send push message, using exponential backoff timeout
-            timeout_sec = 2
-            timeout_tot = 0
-            url_retry = True
-            while url_retry and timeout_tot < 60:
-                try:
-                    timeout_tot += timeout_sec
-                    ua_data = urlfetch.fetch(url, headers={'content-type': 'application/json', 'authorization' : auth_string}, payload=body, method=urlfetch.POST, deadline=timeout_sec)
-                    url_retry = False
-                except DeadlineExceededError:
-                    logging.error("DeadlineExceededError - timeout: " + str(timeout_sec) + ", url: " + url)
-                    timeout_sec *= 2
-            # received no status, and our retries have exceeded the timeout
-            if url_retry:
-                self.resp_simple(0, 'Error=PushServiceFail')
-                return
-            # received status from fetch, handle appropriately
-            if ua_data.status_code == 200:
-                logging.info("Remote Notification successfully sent to UrbanAirship " + str(ua_data.status_code) + " " + str(ua_data.content))
-            elif ua_data.status_code == 500:
-                logging.error("Error: 500, Internal Server Error or Urban Service Unavailable. Our system failed. If this persists, contact support..")
-                self.resp_simple(0, 'Error=PushServiceFail')
-                return
+            apns = None
+            if isProd:
+            	apns = APNs(use_sandbox=False, cert_file=APNS_CERT, key_file=APNS_KEY, enhanced=True)
             else:
-                logging.error("UrbanAirship Error: ." + str(ua_data.status_code))
+            	apns = APNs(use_sandbox=True, cert_file=APNS_CERT, key_file=APNS_KEY, enhanced=True)
+            
+            # Send a notification
+            apnsmessage = {}
+            apnsmessage['data'] = {}
+            apnsmessage['sound'] = 'default'
+            # Todo: badge should be updated with registration database
+            apnsmessage['badge'] = '1'
+            apnsmessage['alert'] = PayloadAlert("title_NotifyFileAvailable", loc_key="title_NotifyFileAvailable")
+            apnsmessage['custom'] = {'nonce': retrievalId}
+            
+            payload = Payload(alert=apnsmessage['alert'], sound=apnsmessage['sound'], custom=apnsmessage['custom'], badge=apnsmessage['badge'])
+            
+            # Status code
+            # 0 No errors encountered
+            # 1 Processing error
+            # 2 Missing device token
+            # 3 Missing topic
+            # 4 Missing payload
+            # 5 Invalid token size
+            # 6 Invalid topic size
+            # 7 Invalid payload size
+            # 8 Invalid token
+            # 10 Shutdown
+            # 255 None (unknown)
+            status = 0
+            try:
+            	identifier = random.getrandbits(32)
+            	status = apns.gateway_server.send_notification(recipientToken, payload, identifier=identifier)
+            	logging.info("status code: %d", status)
+            except DeadlineExceededError:
+            	logging.info("DeadlineExceededError - timeout.")
+            	self.resp_simple(0, 'Error=PushNotificationFail')
+            	return
+               
+            # received status from SSL socket, handle appropriately
+            if status == 0:
+                logging.info("Remote Notification successfully sent to APNS, code: " + str(status))
+            elif status == 1 or status == 10:
+                logging.error("Error: 500, Internal Server Error or APNS Unavailable. Our system failed. If this persists, contact support..")
                 self.resp_simple(0, 'Error=PushNotificationFail')
                 return
+            elif status == 2 or status == 5 or status == 8:
+            	self.resp_simple(0, 'Error=InvalidRegistration')
+            	return
+            else:
+                logging.error("APNS Error: (code = %d)" % status)
+                self.resp_simple(0, 'Error=PushServiceFail')
+                return
             
-            respMessage = struct.pack('!i', ua_data.status_code)
+            respMessage = struct.pack('!i', status)
 
         # NOT IMPLEMENTED PUSH TYPE ===============================================================================
         else: 

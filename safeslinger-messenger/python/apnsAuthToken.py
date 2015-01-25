@@ -23,13 +23,11 @@
 from google.appengine.ext import db
 
 
-class Registration(db.Model):
-    # store the registration data
-    key_id = db.StringProperty(required=True)
-    inserted = db.DateTimeProperty(auto_now=True, indexed=True)
-    client_ver = db.IntegerProperty(required=True)
-    submission_token = db.StringProperty(required=True)
-    registration_id = db.StringProperty(required=True)
-    notify_type = db.IntegerProperty(required=True)
-    badge_num = db.IntegerProperty(required=True, default=0)
-    
+class APNSAuthToken(db.Model):
+    # store APNS credentials for push service
+    apnsCert = db.TextProperty(required=True)
+    apnsKey = db.TextProperty(required=True)
+    lookuptag = db.StringProperty(required=True)
+    inserted = db.DateTimeProperty(auto_now=True)
+    username = db.StringProperty(required=True)
+    comment = db.StringProperty()

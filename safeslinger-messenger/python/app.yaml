@@ -17,6 +17,10 @@ handlers:
   script: authService.py
   secure: always
   
+- url: /apnsLogin
+  script: authService.py
+  secure: always
+
 - url: /postFile1
   script: postMessage.py
   secure: always
@@ -59,4 +63,8 @@ handlers:
 - url: /.*
   script: main.py
   secure: always
+  
+libraries:
+- name: ssl
+  version: latest
   

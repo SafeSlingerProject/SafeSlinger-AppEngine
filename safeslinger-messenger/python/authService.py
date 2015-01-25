@@ -21,13 +21,16 @@
 # THE SOFTWARE.
 
 import cgi
+import datetime
 import os
 
 from google.appengine.api import users
 from google.appengine.ext import webapp
 from google.appengine.ext.webapp.util import run_wsgi_app
 
-import airshipAuthToken
+# deprecated since we remove Urban Airship as push notification provider
+# import airshipAuthToken 
+import apnsAuthToken
 import c2dmAuthToken
 import loginGoogle
 
@@ -67,14 +70,14 @@ class MainPage(webapp.RequestHandler):
                   </form>
                  <br>
 
-                 Urban Airship Service Authorization Update Cache<br>
-                 <form action="/airshipLogin" method="post">                    
-                    UA Application Key: <input type="text" name="appkey" size="60" /><br />
-                    UA Application Secret: <input type="text" name="appsecret" size="60" /><br />
-                    UA Reason: <textarea name="reason" rows="3" cols="60"></textarea><
+                 APNS Authorization Update Cache<br>
+                 <form action="/apnsLogin" method="post">
+                    APNS Cert File(PEM): <br/><textarea rows="10" cols="70" name="apnscert"></textarea><br/>             
+                    APNS Key File(PEM): <br/><textarea rows="10" cols="70" name="apnskey"></textarea><br/>
+                    APNS Reason: <textarea name="reason" rows="3" cols="60"></textarea><
                     <div align="left">
-                      <p><input type="submit" name="submittest" value="Submit TEST Urban Airship" /></p>
-                      <p><input type="submit" name="submitprod" value="Submit PROD Urban Airship" /></p>
+                      <p><input type="submit" name="submittest" value="Submit TEST APNS Credentails" /></p>
+                      <p><input type="submit" name="submitprod" value="Submit PROD APNS Credentails" /></p>
                     </div>
                   </form>
                  <br>
@@ -85,15 +88,15 @@ class MainPage(webapp.RequestHandler):
         else:
             self.redirect(users.create_login_url(self.request.uri))
 
-class AirshipLogin(webapp.RequestHandler):
+class APNSLogin(webapp.RequestHandler):
     def post(self):
         user = users.get_current_user()
 
         # only admins registered with this app can request to store authentication token for the service
         if users.is_current_user_admin():
 
-            appKey = self.request.get('appkey')
-            appSecret = self.request.get('appsecret')
+            apnsCert = self.request.get('apnscert')
+            apnsKey = self.request.get('apnskey')
             comments = self.request.get('reason')
             user = users.get_current_user()
     
@@ -104,36 +107,36 @@ class AirshipLogin(webapp.RequestHandler):
                 
             
             # grab latest proper auth token from our cache
-            query = airshipAuthToken.AirshipAuthToken.all()
+            query = apnsAuthToken.APNSAuthToken.all()
             query.filter('lookuptag =', lookup)
             num = query.count()
         
             # store result, updating old one first
             if num == 1:
-                tokenStore = query.get()
-                tokenStore.appkey = appKey
-                tokenStore.appsecret = appSecret
-                tokenStore.username = user.email()
-                tokenStore.comment = comments
+                credentail = query.get()
+                credentail.apnsCert = apnsCert
+                credentail.apnsKey = apnsKey
+                credentail.username = user.email()
+                credentail.comment = comments
             else:            
-                tokenStore = airshipAuthToken.AirshipAuthToken(appkey=appKey, appsecret=appSecret, username=user.email(), comment=comments, lookuptag=lookup)
+                credentail = apnsAuthToken.APNSAuthToken(apnsCert=apnsCert, apnsKey=apnsKey, username=user.email(), comment=comments, lookuptag=lookup)
 
-            tokenStore.put()
-            key = tokenStore.key()
+            credentail.put()
+            key = credentail.key()
             insertSuccess = True
             if not key.has_id_or_name():
                 insertSuccess = False
     
             # display result
             self.response.out.write('<html><body>')
-            self.response.out.write('UA Updated Lookup Tag: ')
+            self.response.out.write('APNS Updated Lookup Tag: ')
             self.response.out.write(cgi.escape(lookup))
             self.response.out.write('<br>')
-            self.response.out.write('UA App Key: ')
-            self.response.out.write(cgi.escape(appKey))
+            self.response.out.write('APNS Push Certificate: ')
+            self.response.out.write(cgi.escape(apnsCert))
             self.response.out.write('<br>')
-            self.response.out.write('UA App Secret: ')
-            self.response.out.write(cgi.escape(appSecret))
+            self.response.out.write('APNS Push Key: ')
+            self.response.out.write(cgi.escape(apnsKey))
             self.response.out.write('<br>')
             self.response.out.write('Comments: ')
             self.response.out.write(cgi.escape(comments))
@@ -197,7 +200,7 @@ class C2dmLogin(webapp.RequestHandler):
 application = webapp.WSGIApplication(
                                      [('/admin', MainPage),
                                       ('/c2dmLogin', C2dmLogin),
-                                      ('/airshipLogin', AirshipLogin)],
+                                      ('/apnsLogin', APNSLogin)],
                                      debug=True)
 
 def main():
@@ -205,4 +208,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-

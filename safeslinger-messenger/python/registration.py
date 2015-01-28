@@ -31,5 +31,4 @@ class Registration(db.Model):
     submission_token = db.StringProperty(required=True)
     registration_id = db.StringProperty(required=True)
     notify_type = db.IntegerProperty(required=True)
-    badge_num = db.IntegerProperty(required=True, default=0)
     

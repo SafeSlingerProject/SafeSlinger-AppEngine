@@ -88,21 +88,20 @@ class GetMessage(webapp.RequestHandler):
         # query for file in database
         query = filestorage.FileStorage.all()
         query.filter('id =', retrievalId)
-        items = query.fetch(1000)
+        num = query.count()
 
-        # if found package up file and return it
-        num = 0
-        for item in items:
-            msgData = item.msg
-            lenmsg = str.__len__(msgData)
-            
-            self.response.out.write('%s' % struct.pack('!i', server))
-            self.response.out.write('%s' % (struct.pack('!i', 1)))
-            self.response.out.write('%s%s' % (struct.pack('!i', lenmsg), msgData))
-            num = num + 1
-
+        # if found package up file, updated status, and return it
+        if num == 1:
+        	item = query.get()
+        	msgData = item.msg
+        	lenmsg = str.__len__(msgData)
+        	self.response.out.write('%s' % struct.pack('!i', server))
+        	self.response.out.write('%s' % (struct.pack('!i', 1)))
+        	self.response.out.write('%s%s' % (struct.pack('!i', lenmsg), msgData))
+        	item.downloaded = True
+        	item.put()
         # not found, send back error message
-        if num == 0:            
+        elif num == 0:            
             self.resp_simple(0, 'Error=MessageNotFound')
             return
     

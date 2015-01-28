@@ -253,8 +253,6 @@ class PostMessage(webapp.RequestHandler):
             
             logging.info("retrievalId: " + retrievalId)
             logging.info("recipientToken: " + recipientToken)
-    
-            body = json.dumps({"aps": {"badge": "+1", "alert" : { "loc-key" : "title_NotifyFileAvailable" }, "nonce": retrievalId, "sound": "default"}, "device_tokens": [recipientToken]})
             
             apns = None
             if isProd:
@@ -262,12 +260,18 @@ class PostMessage(webapp.RequestHandler):
             else:
             	apns = APNs(use_sandbox=True, cert_file=APNS_CERT, key_file=APNS_KEY, enhanced=True)
             
+            # update badge number
+            query = filestorage.FileStorage.all()
+            undownloaded = False
+            query.filter('sender_token =', recipientToken).filter('downloaded = ', undownloaded)
+            badge = query.count()
+            
             # Send a notification
             apnsmessage = {}
             apnsmessage['data'] = {}
             apnsmessage['sound'] = 'default'
             # Todo: badge should be updated with registration database
-            apnsmessage['badge'] = '1'
+            apnsmessage['badge'] = badge
             apnsmessage['alert'] = PayloadAlert("title_NotifyFileAvailable", loc_key="title_NotifyFileAvailable")
             apnsmessage['custom'] = {'nonce': retrievalId}
             
@@ -289,7 +293,6 @@ class PostMessage(webapp.RequestHandler):
             try:
             	identifier = random.getrandbits(32)
             	status = apns.gateway_server.send_notification(recipientToken, payload, identifier=identifier)
-            	logging.info("status code: %d", status)
             except DeadlineExceededError:
             	logging.info("DeadlineExceededError - timeout.")
             	self.resp_simple(0, 'Error=PushNotificationFail')

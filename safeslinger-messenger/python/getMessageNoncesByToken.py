@@ -90,9 +90,10 @@ class GetMessageNoncesByToken(webapp.RequestHandler):
         
         # query for file in database
         query = filestorage.FileStorage.all()
-        query.filter('sender_token =', recipientToken)
-        query.order("-inserted")
-        items = query.fetch(numquery)
+        downloaded = False
+        query.filter('sender_token =', recipientToken).filter('downloaded = ', downloaded)
+        num = query.count()
+        items = query.fetch(num)
 
         # if found package up file and return it
         lenArray = []

@@ -90,11 +90,9 @@ class AssignUser(webapp.RequestHandler):
                 maxUsers = 9999
             elif (num >= 99):
                 maxUsers = 999
-            elif (num >= 9):
-                maxUsers = 99
             else:
-                maxUsers = 9
-    
+                maxUsers = 99
+
             # we know we can build a set of what remains
             used = []
             for m in query:
@@ -106,7 +104,8 @@ class AssignUser(webapp.RequestHandler):
                     return        
 
             # create a super set of all items from smallest to largest
-            full = set(xrange(1, maxUsers + 1))
+            # also don't assign 1-10 so that users won't confuse the # of users with the grouping id 
+            full = set(xrange(11, maxUsers + 1))
             avail = sorted(full - set(used))   
     
             # we know can get a random number of the remaining range

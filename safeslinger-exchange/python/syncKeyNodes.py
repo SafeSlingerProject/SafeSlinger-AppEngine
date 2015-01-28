@@ -32,6 +32,8 @@ import member
 class SyncKeyNodes(webapp.RequestHandler):
 
     def post(self):
+        self.response.headers.add_header("Access-Control-Allow-Origin", "*")
+
         STR_VERSERVER = '01060000'
         INT_VERCLIENT = 0x01060000
         STR_VERCLIENT = '1.6'

@@ -107,7 +107,7 @@ class PostRegistration(webapp.RequestHandler):
         num = query.count()
     
         # key_id exists, submissionToken must match
-        if num == 1:            
+        if num >= 1:            
             reg_old = query.get()  # only want the oldest        
             # token is authentic
             if submissionToken == reg_old.submission_token:

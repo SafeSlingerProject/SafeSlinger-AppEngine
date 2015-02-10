@@ -196,7 +196,7 @@ class PostMessage(webapp.RequestHandler):
             items2 = query2.fetch(1)  # only want the latest        
             # update registration id and device type if stored already
             for reg_new in items2:
-                logging.info('Key ID found, using lookup reg %s, not submitted reg %s' % (reg_new.registration_id, recipientToken))
+                logging.info('Key ID found, using lookup reg %s..., not submitted reg %s...' % (reg_new.registration_id[0:10], recipientToken[0:10]))
                 recipientToken = reg_new.registration_id
                 devtype = reg_new.notify_type
 

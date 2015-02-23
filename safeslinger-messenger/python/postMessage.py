@@ -35,6 +35,7 @@ from google.appengine.ext import webapp
 from google.appengine.ext.webapp import util
 
 import apnsAuthToken
+import gcmAuthToken
 import c2dm
 import c2dmAuthToken
 import filestorage
@@ -42,6 +43,7 @@ import json
 import registration
 import random
 from apns import APNs, APNsConnection, Payload, PayloadAlert
+import urllib, urllib2
 
 class PostMessage(webapp.RequestHandler):
 
@@ -208,7 +210,7 @@ class PostMessage(webapp.RequestHandler):
             self.resp_simple(0, 'User has no push registration id.')
             return
 
-        # ANDROID PUSH MSG ===============================================================================
+        # C2DM ANDROID PUSH MSG ===============================================================================
         elif devtype == 1: 
             # send push message to Android service...
             sender = c2dm.C2DM()
@@ -235,7 +237,7 @@ class PostMessage(webapp.RequestHandler):
                 self.resp_simple(0, (' %s') % respMessage)
                 return
 
-        # APPLE PUSH MSG ===============================================================================
+        # APNS APPLE PUSH MSG ===============================================================================
         elif devtype == 2: 
             # grab latest proper credential from our cache
             query = apnsAuthToken.APNSAuthToken.all()
@@ -246,9 +248,9 @@ class PostMessage(webapp.RequestHandler):
             	
             items = query.fetch(1)  # only want the latest
             num = 0
-            for credentail in items:
-            	APNS_KEY = credentail.apnsKey
-            	APNS_CERT = credentail.apnsCert
+            for credential in items:
+            	APNS_KEY = credential.apnsKey
+            	APNS_CERT = credential.apnsCert
             	num = num + 1
             
             logging.info("retrievalId: " + retrievalId)
@@ -314,6 +316,52 @@ class PostMessage(webapp.RequestHandler):
                 return
             
             respMessage = struct.pack('!i', status)
+
+        # GCM ANDROID PUSH MSG ===============================================================================
+        elif devtype == 3: 
+            
+            # TODO: use canonical id if it exists
+
+            # grab latest proper credential from our cache
+            query = gcmAuthToken.GcmAuthToken.all().order('-inserted')
+            items = query.fetch(1)  # only want the latest
+            num = 0
+            for token in items:
+                GCM_KEY = credential.gcmKey
+                num = num + 1
+            
+            # Build payload
+            values = {'registration_id' : self.registrationId,
+                      'data.msgid': self.fileid,
+            }        
+    
+            # Build request
+            headers = {'Authorization': 'key=' + GCM_KEY}
+            data = urllib.urlencode(values)
+            request = urllib2.Request('https://android.googleapis.com/gcm/send', data, headers)
+    
+            # Post
+            try:
+                response = urllib2.urlopen(request)
+                # see if we have a new token to use or not...
+                if 'registration_id=' in response.headers:
+                    canonicalId = response.headers['registration_id']
+
+                    # TODO: update registration entry with canonical id
+    
+                responseAsString = response.read()
+            except urllib2.HTTPError, e:
+                logging.error("GCM HTTP Error: ." + str(e))
+                if e.code == 500:
+                    self.resp_simple(0, 'Error=PushServiceFail')
+                    return
+                else:
+                    self.resp_simple(0, 'Error=PushNotificationFail')
+                    return
+
+            if responseAsString.find('Error') != -1:
+                self.resp_simple(0, (' %s') % respMessage)
+                return
 
         # NOT IMPLEMENTED PUSH TYPE ===============================================================================
         else: 

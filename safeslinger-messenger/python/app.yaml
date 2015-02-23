@@ -13,14 +13,14 @@ handlers:
   script: authService.py
   secure: always
   
-- url: /airshipLogin
-  script: authService.py
-  secure: always
-  
 - url: /apnsLogin
   script: authService.py
   secure: always
 
+- url: /gcmLogin
+  script: authService.py
+  secure: always
+  
 - url: /postFile1
   script: postMessage.py
   secure: always

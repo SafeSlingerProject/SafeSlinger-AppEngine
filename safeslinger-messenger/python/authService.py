@@ -28,11 +28,10 @@ from google.appengine.api import users
 from google.appengine.ext import webapp
 from google.appengine.ext.webapp.util import run_wsgi_app
 
-# deprecated since we remove Urban Airship as push notification provider
-# import airshipAuthToken 
 import apnsAuthToken
 import c2dmAuthToken
 import loginGoogle
+import gcmAuthToken 
 
 
 class MainPage(webapp.RequestHandler):
@@ -76,9 +75,19 @@ class MainPage(webapp.RequestHandler):
                     APNS Key File(PEM): <br/><textarea rows="10" cols="70" name="apnskey"></textarea><br/>
                     APNS Reason: <textarea name="reason" rows="3" cols="60"></textarea><
                     <div align="left">
-                      <p><input type="submit" name="submittest" value="Submit TEST APNS Credentails" /></p>
-                      <p><input type="submit" name="submitprod" value="Submit PROD APNS Credentails" /></p>
+                      <p><input type="submit" name="submittest" value="Submit TEST APNS Credentials" /></p>
+                      <p><input type="submit" name="submitprod" value="Submit PROD APNS Credentials" /></p>
                     </div>
+                  </form>
+                 <br>
+
+                  GCM Service Authorization Login Cache<br>
+                  <form action="/gcmLogin" method="post">                    
+                    GCM API Key: <br/><textarea rows="10" cols="70" name="gcmkey"></textarea><br/>
+                    GCM Reason: <textarea name="reason" rows="3" cols="60"></textarea><
+                      <div align="left">
+                        <p><input type="submit" value="Submit GCM API Key" /></p>
+                      </div>
                   </form>
                  <br>
 
@@ -113,16 +122,16 @@ class APNSLogin(webapp.RequestHandler):
         
             # store result, updating old one first
             if num == 1:
-                credentail = query.get()
-                credentail.apnsCert = apnsCert
-                credentail.apnsKey = apnsKey
-                credentail.username = user.email()
-                credentail.comment = comments
+                credential = query.get()
+                credential.apnsCert = apnsCert
+                credential.apnsKey = apnsKey
+                credential.username = user.email()
+                credential.comment = comments
             else:            
-                credentail = apnsAuthToken.APNSAuthToken(apnsCert=apnsCert, apnsKey=apnsKey, username=user.email(), comment=comments, lookuptag=lookup)
+                credential = apnsAuthToken.APNSAuthToken(apnsCert=apnsCert, apnsKey=apnsKey, username=user.email(), comment=comments, lookuptag=lookup)
 
-            credentail.put()
-            key = credentail.key()
+            credential.put()
+            key = credential.key()
             insertSuccess = True
             if not key.has_id_or_name():
                 insertSuccess = False
@@ -183,16 +192,60 @@ class C2dmLogin(webapp.RequestHandler):
             self.response.out.write('User Requesting Token: ')
             self.response.out.write(cgi.escape(user.email()))
             self.response.out.write('<br>')
+            self.response.out.write('C2DM Auth Token: ')
+            self.response.out.write(cgi.escape(clientAuth))
+            self.response.out.write('<br>')
             self.response.out.write('Comments: ')
             self.response.out.write(cgi.escape(comments))
             self.response.out.write('<br>')
-            self.response.out.write('Auth Result: ')
+            self.response.out.write('Insert Result: ')
             if insertSuccess:
-                self.response.out.write(cgi.escape(clientAuth))
+                self.response.out.write('Success')
             else:
                 self.response.out.write('Failed')
             self.response.out.write('</body></html>')        
+    
+        else:
+            self.redirect(users.create_login_url(self.request.uri))
 
+
+class GcmLogin(webapp.RequestHandler):
+    def post(self):
+        user = users.get_current_user()
+
+        # only admins registered with this app can request to store authentication token for the service
+        if users.is_current_user_admin():
+
+            gcmKey = self.request.get('gcmkey')
+            comments = self.request.get('reason')
+            user = users.get_current_user()
+    
+            # store result
+            credential = apnsAuthToken.APNSAuthToken(gcmKey=gcmKey, username=user.email, comment=comments)
+            credential.put()
+            key = credential.key()
+            insertSuccess = True
+            if not key.has_id_or_name():
+                insertSuccess = False
+    
+            # display result
+            self.response.out.write('<html><body>')
+            self.response.out.write('User Requesting Token: ')
+            self.response.out.write(cgi.escape(user.email()))
+            self.response.out.write('<br>')
+            self.response.out.write('GCM API Key: ')
+            self.response.out.write(cgi.escape(gcmKey))
+            self.response.out.write('<br>')
+            self.response.out.write('Comments: ')
+            self.response.out.write(cgi.escape(comments))
+            self.response.out.write('<br>')
+            self.response.out.write('Insert Result: ')
+            if insertSuccess:
+                self.response.out.write('Success')
+            else:
+                self.response.out.write('Failed')
+            self.response.out.write('</body></html>')   
+            
         else:
             self.redirect(users.create_login_url(self.request.uri))
 
@@ -200,7 +253,8 @@ class C2dmLogin(webapp.RequestHandler):
 application = webapp.WSGIApplication(
                                      [('/admin', MainPage),
                                       ('/c2dmLogin', C2dmLogin),
-                                      ('/apnsLogin', APNSLogin)],
+                                      ('/apnsLogin', APNSLogin),
+                                      ('/gcmLogin', GcmLogin)],
                                      debug=True)
 
 def main():

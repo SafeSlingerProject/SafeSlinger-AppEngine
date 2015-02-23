@@ -26,6 +26,10 @@ import base64
 import logging
 import os
 import struct
+# crypto
+from Crypto.Signature import PKCS1_v1_5
+from Crypto.Hash import SHA
+from Crypto.PublicKey import RSA
 
 from google.appengine.ext import webapp
 from google.appengine.ext.webapp import util
@@ -99,6 +103,33 @@ class PostRegistration(webapp.RequestHandler):
         pos = pos + lenregid
 
         devtype = (struct.unpack("!i", data[pos:(pos + 4)]))[0]
+        pos = pos + 4
+        
+        # additional verifying for self signing
+        pubkey_len = (struct.unpack("!i", data[pos:(pos + 4)]))[0]
+        pos = pos + 4
+        pubkey_str = str(data[pos:(pos + pubkey_len)])
+        pos = pos + pubkey_len
+        plain_pos = pos
+        
+        sig_len = (struct.unpack("!i", data[pos:(pos + 4)]))[0]
+        pos = pos + 4
+        sig = data[pos:(pos + sig_len)]
+        pos = pos + sig_len
+        
+        rsa_key = None
+        # Convert from PEM to DER
+        if pubkey_len > 0:
+            # load RSA public key
+            rsa_key = RSA.importKey(base64.decodestring(pubkey_str))
+            # verify signature
+            h = SHA.new()
+            h.update(data[:plain_pos])
+            verifier = PKCS1_v1_5.new(rsa_key)
+            if verifier.verify(h, sig):
+                logging.info('The signature is authentic.')
+            else:
+        	    logging.info('The signature is not authentic.')
       
         # REGISTRATION STORAGE =============================================
         # check if registration needs to be authenticated before insertion or update

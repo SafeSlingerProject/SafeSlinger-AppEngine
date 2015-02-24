@@ -26,6 +26,10 @@ import base64
 import logging
 import os
 import struct
+# crypto
+from Crypto.Signature import PKCS1_v1_5
+from Crypto.Hash import SHA
+from Crypto.PublicKey import RSA
 
 from google.appengine.ext import webapp
 from google.appengine.ext.webapp import util
@@ -71,7 +75,6 @@ class PostRegistration(webapp.RequestHandler):
 
         # unpack all incoming data
         client = (struct.unpack("!i", data[0:4]))[0]
-        data = data[4:]
 
         # client version check
         if client < INT_VERCLIENT:
@@ -80,8 +83,8 @@ class PostRegistration(webapp.RequestHandler):
 
         server = int(CURRENT_VERSION_ID[0:8], 16)
 
-        # unpack all incoming data
-        pos = 0        
+        # unpack all incoming data, skip client version 
+        pos = 4        
 
         lenkeyid = (struct.unpack("!i", data[pos:(pos + 4)]))[0]
         pos = pos + 4
@@ -99,6 +102,39 @@ class PostRegistration(webapp.RequestHandler):
         pos = pos + lenregid
 
         devtype = (struct.unpack("!i", data[pos:(pos + 4)]))[0]
+        pos = pos + 4
+        
+        # additional verifying for self signing
+        if size > pos: # still has data
+        	lennonce = (struct.unpack("!i", data[pos:(pos + 4)]))[0]
+        	pos = pos + 4
+        	nonce = str(data[pos:(pos + lennonce)])
+        	pos = pos + lennonce
+        	
+        	lenpubkey = (struct.unpack("!i", data[pos:(pos + 4)]))[0]
+        	pos = pos + 4
+        	pubkey = str(data[pos:(pos + lenpubkey)])
+        	pos = pos + lenpubkey
+        	plain_pos = pos
+        	
+        	sig_len = (struct.unpack("!i", data[pos:(pos + 4)]))[0]
+        	pos = pos + 4
+        	sig = data[pos:(pos + sig_len)]
+        	pos = pos + sig_len
+        	
+        	# signature verification
+        	if lenpubkey > 0:
+        	    # load RSA public key
+        	    rsa_key = RSA.importKey(base64.decodestring(pubkey))
+        	    # verify signature
+        	    h = SHA.new()
+        	    h.update(data[:plain_pos])
+        	    verifier = PKCS1_v1_5.new(rsa_key)
+        	    if verifier.verify(h, sig):
+        	        logging.debug('The signature is authentic. Registration continues.')
+        	    else:
+        	        logging.error('The signature is not authentic. Registration stops.')
+        	        return
       
         # REGISTRATION STORAGE =============================================
         # check if registration needs to be authenticated before insertion or update

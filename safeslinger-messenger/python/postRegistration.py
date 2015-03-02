@@ -106,6 +106,8 @@ class PostRegistration(webapp.RequestHandler):
         query.filter('key_id =', keyId)
         num = query.count()
     
+        # TODO: postRegistration may update same registration with new key ID so we need to update canonical as well.
+
         # key_id exists, submissionToken must match
         if num >= 1:            
             reg_old = query.get()  # only want the oldest        

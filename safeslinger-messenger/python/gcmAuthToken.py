@@ -25,7 +25,7 @@ from google.appengine.ext import db
 
 class GcmAuthToken(db.Model):
     # store current GCM authentication tokens from push service response
-    token = db.StringProperty(required=True)
+    gcmkey = db.StringProperty(required=True)
     username = db.StringProperty()
     comment = db.StringProperty()
     inserted = db.DateTimeProperty(auto_now=True)

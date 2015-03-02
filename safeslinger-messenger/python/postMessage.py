@@ -198,13 +198,16 @@ class PostMessage(webapp.RequestHandler):
             items2 = query2.fetch(1)  # only want the latest        
             # update registration id and device type if stored already
             for reg_new in items2:
-                logging.info('Key ID found, using lookup reg %s..., not submitted reg %s...' % (reg_new.registration_id[0:10], recipientToken[0:10]))
+                logging.info('Key ID found, using lookup reg (%i)%s..., not submitted reg (%i)%s...' % (reg_new.notify_type, reg_new.registration_id[0:10], devtype, recipientToken[0:10]))
                 recipientToken = reg_new.registration_id
                 devtype = reg_new.notify_type
+                canonicalId = reg_new.canonical_id
 
         # otherwise, just use the submitted registration as is
 
         # BEGIN NOTIFY TYPES ===============================================================================
+        
+        # TODO: Find way to keep push secrets in memory more often, save reads from datastore.
 
         if devtype == 0:
             self.resp_simple(0, 'User has no push registration id.')
@@ -320,21 +323,24 @@ class PostMessage(webapp.RequestHandler):
         # GCM ANDROID PUSH MSG ===============================================================================
         elif devtype == 3: 
             
-            # TODO: use canonical id if it exists
-
             # grab latest proper credential from our cache
             query = gcmAuthToken.GcmAuthToken.all().order('-inserted')
             items = query.fetch(1)  # only want the latest
             num = 0
             for token in items:
-                GCM_KEY = credential.gcmKey
+                GCM_KEY = token.gcmkey
                 num = num + 1
             
             # Build payload
-            values = {'registration_id' : self.registrationId,
-                      'data.msgid': self.fileid,
+            if canonicalId is not None:
+                proper_registration_id = canonicalId
+            else:
+                proper_registration_id = recipientToken
+
+            values = {'registration_id' : proper_registration_id,
+                      'data.msgid': retrievalId,
             }        
-    
+
             # Build request
             headers = {'Authorization': 'key=' + GCM_KEY}
             data = urllib.urlencode(values)
@@ -343,13 +349,26 @@ class PostMessage(webapp.RequestHandler):
             # Post
             try:
                 response = urllib2.urlopen(request)
+                
                 # see if we have a new token to use or not...
                 if 'registration_id=' in response.headers:
                     canonicalId = response.headers['registration_id']
+                    logging.info("canonicalId found " + canonicalId)
 
                     # TODO: update registration entry with canonical id
-    
-                responseAsString = response.read()
+                    # TODO: Store updated canonical for all registration matches.
+                    # TODO: Avoid writing canonical Id when old one matches.
+            
+                respMessage = response.read()
+                logging.info('%s' % respMessage)
+                # When a plain-text request is successful (HTTP status code 200), the response body contains 1 or 2 lines in the form of key/value pairs. The first line is always available and its content is either id=ID of sent message or Error=GCM error code. The second line, if available, has the format of registration_id=canonical ID. The second line is optional, and it can only be sent if the first line is not an error. We recommend handling the plain-text response in a similar way as handling the JSON response:
+                # 
+                #     If first line starts with id, check second line:
+                #         If second line starts with registration_id, gets its value and replace the registration IDs in your server database.
+                #     Otherwise, get the value of Error:
+                #         If it is NotRegistered, remove the registration ID from your server database.
+                #         Otherwise, there is probably a non-recoverable error (Note: Plain-text requests will never return Unavailable as the error code, they would have returned a 500 HTTP status instead).
+
             except urllib2.HTTPError, e:
                 logging.error("GCM HTTP Error: ." + str(e))
                 if e.code == 500:
@@ -359,7 +378,9 @@ class PostMessage(webapp.RequestHandler):
                     self.resp_simple(0, 'Error=PushNotificationFail')
                     return
 
-            if responseAsString.find('Error') != -1:
+            # TODO: Add handling to read plaintext response for error and canonical.
+
+            if respMessage.find('Error') != -1:
                 self.resp_simple(0, (' %s') % respMessage)
                 return
 

@@ -221,7 +221,7 @@ class GcmLogin(webapp.RequestHandler):
             user = users.get_current_user()
     
             # store result
-            credential = apnsAuthToken.APNSAuthToken(gcmKey=gcmKey, username=user.email, comment=comments)
+            credential = gcmAuthToken.GcmAuthToken(gcmkey=gcmKey, username=user.email(), comment=comments)
             credential.put()
             key = credential.key()
             insertSuccess = True

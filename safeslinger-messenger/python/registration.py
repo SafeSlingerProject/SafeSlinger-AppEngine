@@ -31,4 +31,5 @@ class Registration(db.Model):
     submission_token = db.StringProperty(required=True)
     registration_id = db.StringProperty(required=True)
     notify_type = db.IntegerProperty(required=True)
-    
+    canonical_id = db.StringProperty()
+    canonical_updated = db.DateTimeProperty()

@@ -23,27 +23,29 @@
 from __future__ import with_statement
 
 import base64
+import datetime
 import logging
 import os
+import random
 import struct
 import time
+import urllib, urllib2
 
 from google.appengine.api import files, urlfetch
 from google.appengine.api.urlfetch_errors import DeadlineExceededError
-from google.appengine.runtime import DeadlineExceededError
 from google.appengine.ext import webapp
 from google.appengine.ext.webapp import util
+from google.appengine.runtime import DeadlineExceededError
 
+from apns import APNs, APNsConnection, Payload, PayloadAlert
 import apnsAuthToken
-import gcmAuthToken
 import c2dm
 import c2dmAuthToken
 import filestorage
+import gcmAuthToken
 import json
 import registration
-import random
-from apns import APNs, APNsConnection, Payload, PayloadAlert
-import urllib, urllib2
+
 
 class PostMessage(webapp.RequestHandler):
 
@@ -334,6 +336,7 @@ class PostMessage(webapp.RequestHandler):
             # Build payload
             if canonicalId is not None:
                 proper_registration_id = canonicalId
+                logging.info('Canonical ID found, using canon %s..., not reg %s...' % (canonicalId[0:10], recipientToken[0:10]))
             else:
                 proper_registration_id = recipientToken
 
@@ -350,24 +353,22 @@ class PostMessage(webapp.RequestHandler):
             try:
                 response = urllib2.urlopen(request)
                 
-                # see if we have a new token to use or not...
-                if 'registration_id=' in response.headers:
-                    canonicalId = response.headers['registration_id']
-                    logging.info("canonicalId found " + canonicalId)
-
-                    # TODO: update registration entry with canonical id
-                    # TODO: Store updated canonical for all registration matches.
-                    # TODO: Avoid writing canonical Id when old one matches.
-            
                 respMessage = response.read()
                 logging.info('%s' % respMessage)
-                # When a plain-text request is successful (HTTP status code 200), the response body contains 1 or 2 lines in the form of key/value pairs. The first line is always available and its content is either id=ID of sent message or Error=GCM error code. The second line, if available, has the format of registration_id=canonical ID. The second line is optional, and it can only be sent if the first line is not an error. We recommend handling the plain-text response in a similar way as handling the JSON response:
-                # 
-                #     If first line starts with id, check second line:
-                #         If second line starts with registration_id, gets its value and replace the registration IDs in your server database.
-                #     Otherwise, get the value of Error:
-                #         If it is NotRegistered, remove the registration ID from your server database.
-                #         Otherwise, there is probably a non-recoverable error (Note: Plain-text requests will never return Unavailable as the error code, they would have returned a 500 HTTP status instead).
+                
+                # If second line starts with registration_id, gets its value and replace the registration IDs in your server database.
+                lines = respMessage.splitlines()
+                if lines.__len__() == 2:
+                    kv = lines[1].split('=')
+                    if kv[0] == 'registration_id':
+                        # Avoid writing canonical Id when old one matches.
+                        if canonicalId != kv[1]:
+                            # update registration entry with canonical id
+                            reg_new.canonical_id = kv[1]
+                            reg_new.canonical_updated = datetime.datetime.now()       
+                            reg_new.put()
+                            key = reg_new.key()
+                            # TODO: Store updated canonical for all registration matches.
 
             except urllib2.HTTPError, e:
                 logging.error("GCM HTTP Error: ." + str(e))
@@ -378,9 +379,7 @@ class PostMessage(webapp.RequestHandler):
                     self.resp_simple(0, 'Error=PushNotificationFail')
                     return
 
-            # TODO: Add handling to read plaintext response for error and canonical.
-
-            if respMessage.find('Error') != -1:
+            if respMessage.find('Error=') != -1:
                 self.resp_simple(0, (' %s') % respMessage)
                 return
 

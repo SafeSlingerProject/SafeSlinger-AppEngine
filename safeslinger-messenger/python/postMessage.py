@@ -23,25 +23,29 @@
 from __future__ import with_statement
 
 import base64
+import datetime
 import logging
 import os
+import random
 import struct
 import time
+import urllib, urllib2
 
 from google.appengine.api import files, urlfetch
 from google.appengine.api.urlfetch_errors import DeadlineExceededError
-from google.appengine.runtime import DeadlineExceededError
 from google.appengine.ext import webapp
 from google.appengine.ext.webapp import util
+from google.appengine.runtime import DeadlineExceededError
 
+from apns import APNs, APNsConnection, Payload, PayloadAlert
 import apnsAuthToken
 import c2dm
 import c2dmAuthToken
 import filestorage
+import gcmAuthToken
 import json
 import registration
-import random
-from apns import APNs, APNsConnection, Payload, PayloadAlert
+
 
 class PostMessage(webapp.RequestHandler):
 
@@ -196,19 +200,22 @@ class PostMessage(webapp.RequestHandler):
             items2 = query2.fetch(1)  # only want the latest        
             # update registration id and device type if stored already
             for reg_new in items2:
-                logging.info('Key ID found, using lookup reg %s..., not submitted reg %s...' % (reg_new.registration_id[0:10], recipientToken[0:10]))
+                logging.info('Key ID found, using lookup reg (%i)%s..., not submitted reg (%i)%s...' % (reg_new.notify_type, reg_new.registration_id[0:10], devtype, recipientToken[0:10]))
                 recipientToken = reg_new.registration_id
                 devtype = reg_new.notify_type
+                canonicalId = reg_new.canonical_id
 
         # otherwise, just use the submitted registration as is
 
         # BEGIN NOTIFY TYPES ===============================================================================
+        
+        # TODO: Find way to keep push secrets in memory more often, save reads from datastore.
 
         if devtype == 0:
             self.resp_simple(0, 'User has no push registration id.')
             return
 
-        # ANDROID PUSH MSG ===============================================================================
+        # C2DM ANDROID PUSH MSG ===============================================================================
         elif devtype == 1: 
             # send push message to Android service...
             sender = c2dm.C2DM()
@@ -235,7 +242,7 @@ class PostMessage(webapp.RequestHandler):
                 self.resp_simple(0, (' %s') % respMessage)
                 return
 
-        # APPLE PUSH MSG ===============================================================================
+        # APNS APPLE PUSH MSG ===============================================================================
         elif devtype == 2: 
             # grab latest proper credential from our cache
             query = apnsAuthToken.APNSAuthToken.all()
@@ -246,9 +253,9 @@ class PostMessage(webapp.RequestHandler):
             	
             items = query.fetch(1)  # only want the latest
             num = 0
-            for credentail in items:
-            	APNS_KEY = credentail.apnsKey
-            	APNS_CERT = credentail.apnsCert
+            for credential in items:
+            	APNS_KEY = credential.apnsKey
+            	APNS_CERT = credential.apnsCert
             	num = num + 1
             
             logging.info("retrievalId: " + retrievalId)
@@ -314,6 +321,67 @@ class PostMessage(webapp.RequestHandler):
                 return
             
             respMessage = struct.pack('!i', status)
+
+        # GCM ANDROID PUSH MSG ===============================================================================
+        elif devtype == 3: 
+            
+            # grab latest proper credential from our cache
+            query = gcmAuthToken.GcmAuthToken.all().order('-inserted')
+            items = query.fetch(1)  # only want the latest
+            num = 0
+            for token in items:
+                GCM_KEY = token.gcmkey
+                num = num + 1
+            
+            # Build payload
+            if canonicalId is not None:
+                proper_registration_id = canonicalId
+                logging.info('Canonical ID found, using canon %s..., not reg %s...' % (canonicalId[0:10], recipientToken[0:10]))
+            else:
+                proper_registration_id = recipientToken
+
+            values = {'registration_id' : proper_registration_id,
+                      'data.msgid': retrievalId,
+            }        
+
+            # Build request
+            headers = {'Authorization': 'key=' + GCM_KEY}
+            data = urllib.urlencode(values)
+            request = urllib2.Request('https://android.googleapis.com/gcm/send', data, headers)
+    
+            # Post
+            try:
+                response = urllib2.urlopen(request)
+                
+                respMessage = response.read()
+                logging.info('%s' % respMessage)
+                
+                # If second line starts with registration_id, gets its value and replace the registration IDs in your server database.
+                lines = respMessage.splitlines()
+                if lines.__len__() == 2:
+                    kv = lines[1].split('=')
+                    if kv[0] == 'registration_id':
+                        # Avoid writing canonical Id when old one matches.
+                        if canonicalId != kv[1]:
+                            # update registration entry with canonical id
+                            reg_new.canonical_id = kv[1]
+                            reg_new.canonical_updated = datetime.datetime.now()       
+                            reg_new.put()
+                            key = reg_new.key()
+                            # TODO: Store updated canonical for all registration matches.
+
+            except urllib2.HTTPError, e:
+                logging.error("GCM HTTP Error: ." + str(e))
+                if e.code == 500:
+                    self.resp_simple(0, 'Error=PushServiceFail')
+                    return
+                else:
+                    self.resp_simple(0, 'Error=PushNotificationFail')
+                    return
+
+            if respMessage.find('Error=') != -1:
+                self.resp_simple(0, (' %s') % respMessage)
+                return
 
         # NOT IMPLEMENTED PUSH TYPE ===============================================================================
         else: 

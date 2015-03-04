@@ -23,13 +23,10 @@
 from google.appengine.ext import db
 
 
-class Registration(db.Model):
-    # store the registration data
-    key_id = db.StringProperty(required=True)
-    inserted = db.DateTimeProperty(auto_now=True, indexed=True)
-    client_ver = db.IntegerProperty(required=True)
-    submission_token = db.StringProperty(required=True)
-    registration_id = db.StringProperty(required=True)
-    notify_type = db.IntegerProperty(required=True)
-    canonical_id = db.StringProperty()
-    canonical_updated = db.DateTimeProperty()
+class GcmAuthToken(db.Model):
+    # store current GCM authentication tokens from push service response
+    gcmkey = db.StringProperty(required=True)
+    username = db.StringProperty()
+    comment = db.StringProperty()
+    inserted = db.DateTimeProperty(auto_now=True)
+

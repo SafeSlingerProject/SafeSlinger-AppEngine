@@ -27,7 +27,7 @@ To build your own secure exchange server using App Engine:
 1. First, go to the Google App Engine [Create Application](http://appengine.google.com/start/createapp) pages to create a new server app. Under 'Application Identifier' use your own identifier: **________.appspot.com**. Do **NOT** use myappengine.appspot.com or slinger-dev.appspot.com, as they are both taken.
 3. Under 'Application Title' use the name of your own application.
 4. Under 'Authentication Options (Advanced)' choose **Open to all Google Accounts users**.
-5. Under 'Storage Options (Advanced)' choose **Master/Slave**. While this option has been deprecated, in favor of High Replication, the server source code exchange still relies on immediate concurrency. When the server source is upgraded to work well using eventual concurrency, this option can change to the recommended High Replication option.
+5. Under 'Storage Options (Advanced)' choose **High Replication**.
 6. Click on the **Create Application** button.
 7. Next, edit the source code from the **/safeslinger-demo/python** folder to use the new application identifier you just created in the `app.yaml` file. Change the line `application: slinger-demo` to `application: `**mynewapplicationidentifierfromstep1**. 
 8. Deploy your new application after reading up on [Uploading Your Application](http://developers.google.com/appengine/docs/python/gettingstartedpython27/uploading).

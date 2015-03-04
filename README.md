@@ -7,7 +7,7 @@ Library Features:
 - Open source makes security audits easy.
 - The only secure simultaneous key exchange for up to 10 people.
 - Easy to implement and use.
-- Cross-platform Android and iOS ([iOS library](http://github.com/SafeSlingerProject/SafeSlinger-iOS) coming Spring 2014).
+- Cross-platform Android and iOS.
 - Protection from Man-In-The-Middle attacks during key exchanges.
 - Exchange keys either in person or remote.
 

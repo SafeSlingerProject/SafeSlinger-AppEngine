@@ -20,6 +20,7 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 # THE SOFTWARE.
 
+import logging
 import os
 import struct
 
@@ -59,8 +60,10 @@ class SyncKeyNodes(webapp.RequestHandler):
         # get the data from the post
         self.response.headers['Content-Type'] = 'application/octet-stream'
         data = self.request.body
+        logging.debug("in body '%s'" % data)
     
         size = str.__len__(data)
+        logging.debug("in size %d" % size)
 
         if size < minlen:
             self.resp_simple(0, 'Request was formatted incorrectly.')
@@ -69,15 +72,20 @@ class SyncKeyNodes(webapp.RequestHandler):
         # unpack all incoming data
         server = int(CURRENT_VERSION_ID[0:8], 16)
         client = (struct.unpack("!i", data[0:4]))[0]
+        logging.debug("in size %d" % size)
         usrid = (struct.unpack("!i", data[4:8]))[0]
+        logging.debug("in usrid %d" % usrid)
         data = data[8:]
         expectedsize = 4 + 4
 
         postKeyNodes = False
         if size > expectedsize:
             usridpost = (struct.unpack("!i", data[0:4]))[0]
+            logging.debug("in usridpost %i" % usridpost)
             sizeData = (struct.unpack("!i", data[4:8]))[0]
+            logging.debug("in sizeData %i" % sizeData)
             key_node = (struct.unpack(str(sizeData) + "s", data[8:8 + sizeData]))[0]
+            logging.debug("in key_node '%s'" % key_node)
             postKeyNodes = True
  
         # client version check
@@ -114,17 +122,22 @@ class SyncKeyNodes(webapp.RequestHandler):
                                 
             # version
             self.response.out.write('%s' % struct.pack('!i', server))
+            logging.debug("out server %i" % server)
 
             # node data
             mem = query.get()
             if mem.key_node != None:
                 # n results
                 self.response.out.write('%s' % struct.pack('!i', num))
+                logging.debug("out total key_nodes %i" % num)
                 length = str.__len__(mem.key_node)
                 self.response.out.write('%s%s' % (struct.pack('!i', length), mem.key_node))                    
+                logging.debug("out mem.key_node length %i" % length)
+                logging.debug("out mem.key_node '%s'" % mem.key_node)
             else:
                 # n results
                 self.response.out.write('%s' % struct.pack('!i', 0))
+                logging.debug("out total key_nodes %i" % 0)
 
         
         else:
@@ -134,9 +147,20 @@ class SyncKeyNodes(webapp.RequestHandler):
 
     def resp_simple(self, code, msg):
         self.response.out.write('%s%s' % (struct.pack('!i', code), msg))
+        logging.debug("out error code %i" % code)
+        logging.debug("out error msg '%s'" % msg)
 
 
 def main():
+    STR_VERSERVER = '01060000'
+    CURRENT_VERSION_ID = os.environ.get('CURRENT_VERSION_ID', STR_VERSERVER)
+    isProd = CURRENT_VERSION_ID[8:9] == 'p'
+    # Set the logging level in the main function
+    if isProd:
+        logging.getLogger().setLevel(logging.INFO)
+    else:
+        logging.getLogger().setLevel(logging.DEBUG)
+
     application = webapp.WSGIApplication([('/syncKeyNodes', SyncKeyNodes),
                                      ],
                                      debug=True)

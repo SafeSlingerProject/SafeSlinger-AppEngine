@@ -20,6 +20,7 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 # THE SOFTWARE.
 
+import logging
 import os
 import struct
 
@@ -59,8 +60,10 @@ class SyncData(webapp.RequestHandler):
         # get the data from the post
         self.response.headers['Content-Type'] = 'application/octet-stream'
         data = self.request.body
+        logging.debug("in body '%s'" % data)
 
         size = str.__len__(data)
+        logging.debug("in size %d" % size)
 
         if size < minlen:
             self.resp_simple(0, 'Request was formatted incorrectly.')
@@ -69,18 +72,22 @@ class SyncData(webapp.RequestHandler):
         # unpack all incoming data
         server = int(CURRENT_VERSION_ID[0:8], 16)
         client = (struct.unpack("!i", data[0:4]))[0]
+        logging.debug("in size %d" % size)
         data = data[4:]
 
         # unpack all incoming data
         usrids = []
         usrid = (struct.unpack("!i", data[0:4]))[0]
+        logging.debug("in usrid %d" % usrid)
         numEntry = (struct.unpack("!i", data[4:8]))[0]
+        logging.debug("in numEntry %d" % numEntry)
         data = data[8:]
         expectedsize = 4 + 4 + 4 + (4 * numEntry)
 
         # append enough entries to hold the expected data
         while numEntry > len(usrids):
             usrids.append(struct.unpack("!i", data[0:4])[0])
+            logging.debug("in usrid known %i" % struct.unpack("!i", data[0:4]))
             data = data[4:]
  
         # client version check
@@ -92,7 +99,8 @@ class SyncData(webapp.RequestHandler):
         if size > expectedsize:
             newVal = data[0:]
             postSig = True
-                    
+            logging.debug("in data '%s'" % newVal)
+                   
         # verify you have an existing group
         query = member.Member.all()
         query.filter('usr_id =', usrid)
@@ -125,6 +133,7 @@ class SyncData(webapp.RequestHandler):
     
             # version
             self.response.out.write('%s' % struct.pack('!i', server))
+            logging.debug("out server %i" % server)
 
             # grand total
             num = 0
@@ -133,6 +142,7 @@ class SyncData(webapp.RequestHandler):
                     num = num + 1
             
             self.response.out.write('%s' % struct.pack('!i', num))
+            logging.debug("out total datas %i" % num)
     
             # add delta ids total
             num = 0
@@ -145,6 +155,7 @@ class SyncData(webapp.RequestHandler):
                     num = num + 1
             
             self.response.out.write('%s' % struct.pack('!i', num))
+            logging.debug("out delta datas %i" % num)
     
             for mem in mems:
                 posted = False
@@ -154,6 +165,9 @@ class SyncData(webapp.RequestHandler):
                 if (not posted) & (mem.data != None):
                     length = str.__len__(mem.data)
                     self.response.out.write('%s%s' % (struct.pack('!ii', mem.usr_id, length), mem.data))
+                    logging.debug("out mem.usr_id %i" % mem.usr_id)
+                    logging.debug("out mem.data length %i" % length)
+                    logging.debug("out mem.data '%s'" % mem.data)
         
         else:
             self.resp_simple(0, ' user %i does not exist' % (usrid))
@@ -162,9 +176,20 @@ class SyncData(webapp.RequestHandler):
 
     def resp_simple(self, code, msg):
         self.response.out.write('%s%s' % (struct.pack('!i', code), msg))
+        logging.debug("out error code %i" % code)
+        logging.debug("out error msg '%s'" % msg)
 
 
 def main():
+    STR_VERSERVER = '01060000'
+    CURRENT_VERSION_ID = os.environ.get('CURRENT_VERSION_ID', STR_VERSERVER)
+    isProd = CURRENT_VERSION_ID[8:9] == 'p'
+    # Set the logging level in the main function
+    if isProd:
+        logging.getLogger().setLevel(logging.INFO)
+    else:
+        logging.getLogger().setLevel(logging.DEBUG)
+
     application = webapp.WSGIApplication([('/syncData', SyncData),
                                      ],
                                      debug=True)

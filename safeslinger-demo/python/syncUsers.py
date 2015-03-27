@@ -20,6 +20,7 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 # THE SOFTWARE.
 
+import logging
 import os
 import struct
 
@@ -59,8 +60,10 @@ class SyncUsers(webapp.RequestHandler):
         # get the data from the post
         self.response.headers['Content-Type'] = 'application/octet-stream'
         data = self.request.body
+        logging.debug("in body '%s'" % data)
     
         size = str.__len__(data)
+        logging.debug("in size %d" % size)
 
         if size < minlen:
             self.resp_simple(0, 'Request was formatted incorrectly.')
@@ -69,20 +72,26 @@ class SyncUsers(webapp.RequestHandler):
         # unpack all incoming data
         server = int(CURRENT_VERSION_ID[0:8], 16)
         client = (struct.unpack("!i", data[0:4]))[0]
+        logging.debug("in client %d" % client)
         data = data[4:]
 
         usrids = []
         usrid = (struct.unpack("!i", data[0:4]))[0]
+        logging.debug("in usrid %d" % usrid)
         usridlink = (struct.unpack("!i", data[4:8]))[0]
+        logging.debug("in usridlink %d" % usridlink)
         numEntry = (struct.unpack("!i", data[8:12]))[0]
+        logging.debug("in numEntry %d" % numEntry)
         data = data[12:]
         expectedsize = 4 + 4 + 4 + 4 + (4 * numEntry)
 
         # append enough entries to hold the expected data
         while numEntry > len(usrids):
             usrids.append(struct.unpack("!i", data[0:4])[0])
+            logging.debug("in usrid known %i" % struct.unpack("!i", data[0:4]))
             data = data[4:]
  
+
         # client version check
         if client < INT_VERCLIENT:
             self.resp_simple(0, ('Client version mismatch; %s required.  Download latest client release first.' % STR_VERCLIENT))
@@ -91,6 +100,7 @@ class SyncUsers(webapp.RequestHandler):
         postSig = False
         if size > expectedsize:
             postSig = True
+            logging.debug("in commitment '%s'" % data)
                     
         # verify you have an existing user
         query = member.Member.all()
@@ -123,6 +133,7 @@ class SyncUsers(webapp.RequestHandler):
 
             # version
             self.response.out.write('%s' % struct.pack('!i', server))
+            logging.debug("out server %i" % server)
 
             # lowest client version
             q = member.Member.all()
@@ -130,6 +141,7 @@ class SyncUsers(webapp.RequestHandler):
             m = q.fetch(1000)
             low_client = self.getLowestVersion(m)
             self.response.out.write('%s' % struct.pack('!i', low_client))
+            logging.debug("out low_client %i" % low_client)
 
             # grand total
             num = 0
@@ -138,6 +150,7 @@ class SyncUsers(webapp.RequestHandler):
                     num = num + 1
             
             self.response.out.write('%s' % struct.pack('!i', num))
+            logging.debug("out total commits %i" % num)
       
             # add delta ids total
             num = 0
@@ -150,6 +163,7 @@ class SyncUsers(webapp.RequestHandler):
                     num = num + 1
             
             self.response.out.write('%s' % struct.pack('!i', num))
+            logging.debug("out delta commits %i" % num)
     
             for mem in mems:
                 posted = False
@@ -159,6 +173,9 @@ class SyncUsers(webapp.RequestHandler):
                 if (not posted) & (mem.commitment != None):
                     length = str.__len__(mem.commitment)
                     self.response.out.write('%s%s' % (struct.pack('!ii', mem.usr_id, length), mem.commitment))
+                    logging.debug("out mem.usr_id %i" % mem.usr_id)
+                    logging.debug("out mem.commitment length %i" % length)
+                    logging.debug("out mem.commitment '%s'" % mem.commitment)
         
         else:
             self.resp_simple(0, ' user %i does not exist' % (usrid))
@@ -167,6 +184,8 @@ class SyncUsers(webapp.RequestHandler):
 
     def resp_simple(self, code, msg):
         self.response.out.write('%s%s' % (struct.pack('!i', code), msg))
+        logging.debug("out error code %i" % code)
+        logging.debug("out error msg '%s'" % msg)
     
 
     def getLowestVersion(self, mems):
@@ -189,6 +208,15 @@ class SyncUsers(webapp.RequestHandler):
     
 
 def main():
+    STR_VERSERVER = '01060000'
+    CURRENT_VERSION_ID = os.environ.get('CURRENT_VERSION_ID', STR_VERSERVER)
+    isProd = CURRENT_VERSION_ID[8:9] == 'p'
+    # Set the logging level in the main function
+    if isProd:
+        logging.getLogger().setLevel(logging.INFO)
+    else:
+        logging.getLogger().setLevel(logging.DEBUG)
+
     application = webapp.WSGIApplication([('/syncUsers', SyncUsers),
                                      ],
                                      debug=True)

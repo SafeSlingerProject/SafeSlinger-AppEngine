@@ -61,8 +61,10 @@ class AssignUser(webapp.RequestHandler):
         # get the data from the post
         self.response.headers['Content-Type'] = 'application/octet-stream'
         data = self.request.body
+        logging.debug("in body '%s'" % data)
     
         size = str.__len__(data)
+        logging.debug("in size %d" % size)
 
         if size < minlen:
             self.resp_simple(0, 'Request was formatted incorrectly.')
@@ -71,7 +73,9 @@ class AssignUser(webapp.RequestHandler):
         # unpack all incoming data
         server = int(CURRENT_VERSION_ID[0:8], 16)
         client = (struct.unpack("!i", data[0:4]))[0]
+        logging.debug("in client %d" % client)
         data = data[4:]
+        logging.debug("in commitment '%s'" % data)
  
         # client version check
         if client < INT_VERCLIENT:
@@ -133,15 +137,28 @@ class AssignUser(webapp.RequestHandler):
                               
         # version
         self.response.out.write('%s' % struct.pack('!i', server))
+        logging.debug("out server %i" % server)
 
         # user id assigned
         self.response.out.write('%s' % struct.pack('!i', usrid))
+        logging.debug("out usrid %i" % usrid)
 
     def resp_simple(self, code, msg):
         self.response.out.write('%s%s' % (struct.pack('!i', code), msg))
+        logging.debug("out error code %i" % code)
+        logging.debug("out error msg '%s'" % msg)
     
 
 def main():
+    STR_VERSERVER = '01060000'
+    CURRENT_VERSION_ID = os.environ.get('CURRENT_VERSION_ID', STR_VERSERVER)
+    isProd = CURRENT_VERSION_ID[8:9] == 'p'
+    # Set the logging level in the main function
+    if isProd:
+        logging.getLogger().setLevel(logging.INFO)
+    else:
+        logging.getLogger().setLevel(logging.DEBUG)
+
     application = webapp.WSGIApplication([('/assignUser', AssignUser),
                                      ],
                                      debug=True)

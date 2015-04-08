@@ -21,6 +21,7 @@
 # THE SOFTWARE.
 
 import datetime
+import logging
 
 from google.appengine.ext import blobstore, db, webapp
 from google.appengine.ext.webapp import util
@@ -44,6 +45,8 @@ class CleanUp(webapp.RequestHandler):
             fquery = db.Query(filestorage.FileStorage).filter('inserted <', thenMem)
             files = []
     
+            downloaded = 0
+            pending = 0
             for f in fquery:
                 blob_key = f.blobkey
                 # delete blobstore item if exists
@@ -51,8 +54,14 @@ class CleanUp(webapp.RequestHandler):
                     blobstore.delete(f.blobkey)
                 # delete datastore item
                 files.append(f)
+                
+                if f.downloaded:
+                    downloaded += 1
+                else:
+                    pending += 1
             
             db.delete(files)
+            logging.info('cleanup: downloaded=%i, pending=%i' % (downloaded, pending))
     
             # delete old authorization tokens if there are more than 10
             tquery = db.Query(c2dmAuthToken.C2dmAuthToken).order('-inserted')
@@ -64,6 +73,7 @@ class CleanUp(webapp.RequestHandler):
                 i = i + 1
             
             db.delete(tokens)
+            logging.info('cleanup: old tokens=%i' % (tokens.__len__()))
 
 def main():
     application = webapp.WSGIApplication([('/cron/cleanup', CleanUp)],

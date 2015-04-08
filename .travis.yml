@@ -4,5 +4,5 @@ python:
   - "2.7"
 
 before_script:
-  - wget https://commondatastorage.googleapis.com/appengine-sdks/featured/google_appengine_1.9.4.zip -nv
+  - wget https://commondatastorage.googleapis.com/appengine-sdks/featured/google_appengine_1.9.18.zip -nv
   - unzip -q google_appengine_1.9.4.zip

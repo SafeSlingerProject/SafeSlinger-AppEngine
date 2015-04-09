@@ -190,6 +190,7 @@ class PostMessage(webapp.RequestHandler):
         # PUSH REGISTRATION UPDATE ===============================================================================
         # TODO: this could be structured better to query one data set, rather than 2 queries
         # make sure the most recent push registration id is used 
+        canonicalId = None
         query = registration.Registration.all().order('-inserted')
         query.filter('registration_id =', recipientToken)
         items = query.fetch(1)  # only want the latest        

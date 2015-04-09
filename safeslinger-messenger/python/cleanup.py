@@ -38,27 +38,32 @@ class CleanUp(webapp.RequestHandler):
         if self.request.headers.get('X-AppEngine-Cron') == 'true':
     
             # delete messages older than 24 hours
-            timeout = 60 * 60 * 24  # 24 hours
-            now = datetime.datetime.now()        
-            deltaMem = datetime.timedelta(seconds=timeout) 
-            thenMem = now - deltaMem        
-            fquery = db.Query(filestorage.FileStorage).filter('inserted <', thenMem)
+            TIMEOUT_DOWN = 60 * 60 * 24  # 24 hours
+            TIMEOUT_PEND = 60 * 60 * 24 * 14  # 2 weeks
+            now = datetime.datetime.now()
+            downLastDate = now - datetime.timedelta(seconds=TIMEOUT_DOWN)
+            pendlastDate = now - datetime.timedelta(seconds=TIMEOUT_PEND)
+            fquery = db.Query(filestorage.FileStorage).filter('inserted <', downLastDate)
             files = []
     
             downloaded = 0
             pending = 0
             for f in fquery:
+                # remove all attachments after TIMEOUT_DOWN
                 blob_key = f.blobkey
                 # delete blobstore item if exists
                 if blob_key:
                     blobstore.delete(f.blobkey)
-                # delete datastore item
-                files.append(f)
-                
-                if f.downloaded:
-                    downloaded += 1
-                else:
-                    pending += 1
+
+                # remove downloaded after TIMEOUT_DOWN, the rest after TIMEOUT_PEND
+                if f.downloaded or f.inserted < pendlastDate:
+                    # delete datastore item
+                    files.append(f)
+                    
+                    if f.downloaded:
+                        downloaded += 1
+                    else:
+                        pending += 1
             
             db.delete(files)
             logging.info('cleanup: downloaded=%i, pending=%i' % (downloaded, pending))

@@ -30,6 +30,7 @@ import random
 import struct
 import time
 import urllib, urllib2
+import httplib
 
 from google.appengine.api import files, urlfetch
 from google.appengine.api.urlfetch_errors import DeadlineExceededError
@@ -190,6 +191,7 @@ class PostMessage(webapp.RequestHandler):
         # PUSH REGISTRATION UPDATE ===============================================================================
         # TODO: this could be structured better to query one data set, rather than 2 queries
         # make sure the most recent push registration id is used 
+        canonicalId = None
         query = registration.Registration.all().order('-inserted')
         query.filter('registration_id =', recipientToken)
         items = query.fetch(1)  # only want the latest        
@@ -349,36 +351,49 @@ class PostMessage(webapp.RequestHandler):
             data = urllib.urlencode(values)
             request = urllib2.Request('https://android.googleapis.com/gcm/send', data, headers)
     
-            # Post
-            try:
-                response = urllib2.urlopen(request)
-                
-                respMessage = response.read()
-                logging.info('%s' % respMessage)
-                
-                # If second line starts with registration_id, gets its value and replace the registration IDs in your server database.
-                lines = respMessage.splitlines()
-                if lines.__len__() == 2:
-                    kv = lines[1].split('=')
-                    if kv[0] == 'registration_id':
-                        # Avoid writing canonical Id when old one matches.
-                        if canonicalId != kv[1]:
-                            # update registration entry with canonical id
-                            reg_new.canonical_id = kv[1]
-                            reg_new.canonical_updated = datetime.datetime.now()       
-                            reg_new.put()
-                            key = reg_new.key()
-                            # TODO: Store updated canonical for all registration matches.
-
-            except urllib2.HTTPError, e:
-                logging.error("GCM HTTP Error: ." + str(e))
-                if e.code == 500:
-                    self.resp_simple(0, 'Error=PushServiceFail')
-                    return
-                else:
-                    self.resp_simple(0, 'Error=PushNotificationFail')
-                    return
-
+            # attempt to send push message, using exponential backoff timeout
+            timeout_sec = 2
+            timeout_tot = 0
+            url_retry = True
+            while url_retry and timeout_tot < 32:
+                try:
+                    timeout_tot += timeout_sec
+                    response = urllib2.urlopen(request, timeout=timeout_sec)
+                    url_retry = False
+                    
+                    respMessage = response.read()
+                    logging.info('%s' % respMessage)
+                    
+                    # If second line starts with registration_id, gets its value and replace the registration IDs in your server database.
+                    lines = respMessage.splitlines()
+                    if lines.__len__() == 2:
+                        kv = lines[1].split('=')
+                        if kv[0] == 'registration_id':
+                            # Avoid writing canonical Id when old one matches.
+                            if canonicalId != kv[1]:
+                                # update registration entry with canonical id
+                                reg_new.canonical_id = kv[1]
+                                reg_new.canonical_updated = datetime.datetime.now()       
+                                reg_new.put()
+                                key = reg_new.key()
+                                # TODO: Store updated canonical for all registration matches.
+    
+                except httplib.HTTPException, e:
+                    logging.info("GCM HTTPException: ." + str(e) + " - timeout: " + str(timeout_sec))
+                    timeout_sec *= 2
+                except urllib2.HTTPError, e:
+                    logging.error("GCM HTTPError: ." + str(e))
+                    if e.code == 500:
+                        self.resp_simple(0, 'Error=PushServiceFail')
+                        return
+                    else:
+                        self.resp_simple(0, 'Error=PushNotificationFail')
+                        return
+            # received no status, and our retries have exceeded the timeout
+            if url_retry:
+                self.resp_simple(0, 'Error=PushServiceFail')
+                return
+            
             if respMessage.find('Error=') != -1:
                 self.resp_simple(0, (' %s') % respMessage)
                 return

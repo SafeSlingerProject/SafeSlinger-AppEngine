@@ -23,6 +23,7 @@
 import logging
 import urllib
 import urllib2
+import httplib
 
 import c2dmAuthToken
 
@@ -55,22 +56,38 @@ class C2DM():
         data = urllib.urlencode(values)
         request = urllib2.Request(self.url, data, headers)
 
-        # Post
-        try:
-            response = urllib2.urlopen(request)
-            # see if we have a new token to use or not...
-            if 'Update-Client-Auth' in response.headers:
-                tokenStore = c2dmAuthToken.C2dmAuthToken(token=response.headers['Update-Client-Auth'], username='Update-Client-Auth', comment='Update-Client-Auth in response')
-                tokenStore.put()
-                key = tokenStore.key()
-                if not key.has_id_or_name():
-                    logging.error("C2DM HTTP Error: c2dm token insert failed for " + response.headers['Update-Client-Auth'])
+        # attempt to send push message, using exponential backoff timeout
+        timeout_sec = 2
+        timeout_tot = 0
+        url_retry = True
+        while url_retry and timeout_tot < 32:
+            try:
+                timeout_tot += timeout_sec
+                response = urllib2.urlopen(request, timeout=timeout_sec)
+                url_retry = False
+                
+                respMessage = response.read()
+                logging.info('%s' % respMessage)
+                
+                # see if we have a new token to use or not...
+                if 'Update-Client-Auth' in response.headers:
+                    tokenStore = c2dmAuthToken.C2dmAuthToken(token=response.headers['Update-Client-Auth'], username='Update-Client-Auth', comment='Update-Client-Auth in response')
+                    tokenStore.put()
+                    key = tokenStore.key()
+                    if not key.has_id_or_name():
+                        logging.error("C2DM: c2dm token insert failed for " + response.headers['Update-Client-Auth'])
+    
+                return respMessage
 
-            responseAsString = response.read()
-            return responseAsString
-        except urllib2.HTTPError, e:
-            logging.error("C2DM HTTP Error: ." + str(e))
-            if e.code == 500:
-                return 'Error=PushServiceFail'
-            else:
-                return 'Error=PushNotificationFail'
+            except httplib.HTTPException, e:
+                logging.info("C2DM HTTPException: ." + str(e) + " - timeout: " + str(timeout_sec))
+                timeout_sec *= 2
+            except urllib2.HTTPError, e:
+                logging.error("C2DM HTTP Error: ." + str(e))
+                if e.code == 500:
+                    return 'Error=PushServiceFail'
+                else:
+                    return 'Error=PushNotificationFail'
+        # received no status, and our retries have exceeded the timeout
+        if url_retry:
+            return 'Error=PushServiceFail'

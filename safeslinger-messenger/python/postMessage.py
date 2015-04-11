@@ -24,21 +24,21 @@ from __future__ import with_statement
 
 import base64
 import datetime
+import httplib
 import logging
 import os
 import random
 import struct
 import time
 import urllib, urllib2
-import httplib
 
-from google.appengine.api import files, urlfetch
+from google.appengine.api import files
 from google.appengine.api.urlfetch_errors import DeadlineExceededError
 from google.appengine.ext import webapp
 from google.appengine.ext.webapp import util
 from google.appengine.runtime import DeadlineExceededError
 
-from apns import APNs, APNsConnection, Payload, PayloadAlert
+from apns import APNs, Payload, PayloadAlert
 import apnsAuthToken
 import c2dm
 import c2dmAuthToken
@@ -128,6 +128,42 @@ class PostMessage(webapp.RequestHandler):
             else:
                 devtype = 1  # c2dm were longer
                       
+        # PUSH REGISTRATION UPDATE ===============================================================================
+        # make sure the most recent push registration id is used 
+        canonicalId = None
+        active_reg = True
+        reg_new = None
+        query = registration.Registration.all().order('-inserted')
+        query.filter('registration_id =', recipientToken)
+        reg_old = query.get()  # only want the latest
+        if reg_old is not None:
+            # lookup matching key ids
+            query2 = registration.Registration.all().order('-inserted')
+            query2.filter('key_id =', reg_old.key_id)
+            reg_new = query2.get()  # only want the latest        
+            if reg_new is not None:
+                # update registration id and device type if stored already
+                logging.info('Key ID found, using lookup reg (%i)%s..., not submitted reg (%i)%s...' % (reg_new.notify_type, reg_new.registration_id[0:10], devtype, recipientToken[0:10]))
+                recipientToken = reg_new.registration_id
+                devtype = reg_new.notify_type
+                canonicalId = reg_new.canonical_id
+                active_reg = reg_new.active
+    
+        # otherwise, just use the submitted registration as is
+
+        # inactive registrations should not push to this registration id
+        if not active_reg:
+            self.resp_simple(0, 'Error=InvalidRegistration')
+            return
+        
+        # NOT IMPLEMENTED PUSH TYPES ===============================================================================
+        if devtype <= 0:
+            self.resp_simple(0, 'User has no push registration id.')
+            return
+        elif devtype >= 4:
+            self.resp_simple(0, ('Sending to device type %i not yet implemented.' % devtype))
+            return
+
         # FILE STORAGE ===============================================================================
         if lenfd > 0:
             DATASTORE_LIMIT = 1000000  # max bytes for datastore storage
@@ -169,7 +205,6 @@ class PostMessage(webapp.RequestHandler):
         # this is critical to support eventual concurrency, and to prevent mis-classifying live messages as expired.
         # query for live message, using exponential backoff timeout.
         msgdata_sec = .25
-        # TODO: adjust period based on deployment testing
         msgdata_tot = 0
         data_retry = True
         while data_retry and msgdata_tot < 32:  # don't wait more than 32 seconds for concurrency
@@ -185,40 +220,12 @@ class PostMessage(webapp.RequestHandler):
                 msgdata_sec *= 2
         # data retries have exceeded the timeout
         if data_retry:
-            # TODO: model if erroring out to the client is best or if we can delay push sending
             logging.error("Continuing with push after FileStorage concurrency timed out: " + str(msgdata_sec))
 
-        # PUSH REGISTRATION UPDATE ===============================================================================
-        # TODO: this could be structured better to query one data set, rather than 2 queries
-        # make sure the most recent push registration id is used 
-        canonicalId = None
-        query = registration.Registration.all().order('-inserted')
-        query.filter('registration_id =', recipientToken)
-        items = query.fetch(1)  # only want the latest        
-        # lookup matching key ids
-        for reg_old in items:
-            query2 = registration.Registration.all().order('-inserted')
-            query2.filter('key_id =', reg_old.key_id)
-            items2 = query2.fetch(1)  # only want the latest        
-            # update registration id and device type if stored already
-            for reg_new in items2:
-                logging.info('Key ID found, using lookup reg (%i)%s..., not submitted reg (%i)%s...' % (reg_new.notify_type, reg_new.registration_id[0:10], devtype, recipientToken[0:10]))
-                recipientToken = reg_new.registration_id
-                devtype = reg_new.notify_type
-                canonicalId = reg_new.canonical_id
-
-        # otherwise, just use the submitted registration as is
-
         # BEGIN NOTIFY TYPES ===============================================================================
-        
-        # TODO: Find way to keep push secrets in memory more often, save reads from datastore.
-
-        if devtype == 0:
-            self.resp_simple(0, 'User has no push registration id.')
-            return
 
         # C2DM ANDROID PUSH MSG ===============================================================================
-        elif devtype == 1: 
+        if devtype == 1: 
             # send push message to Android service...
             sender = c2dm.C2DM()
             sender.registrationId = recipientToken
@@ -279,7 +286,6 @@ class PostMessage(webapp.RequestHandler):
             apnsmessage = {}
             apnsmessage['data'] = {}
             apnsmessage['sound'] = 'default'
-            # Todo: badge should be updated with registration database
             apnsmessage['badge'] = badge
             apnsmessage['alert'] = PayloadAlert("title_NotifyFileAvailable", loc_key="title_NotifyFileAvailable")
             apnsmessage['custom'] = {'nonce': retrievalId}
@@ -371,12 +377,11 @@ class PostMessage(webapp.RequestHandler):
                         if kv[0] == 'registration_id':
                             # Avoid writing canonical Id when old one matches.
                             if canonicalId != kv[1]:
-                                # update registration entry with canonical id
-                                reg_new.canonical_id = kv[1]
-                                reg_new.canonical_updated = datetime.datetime.now()       
-                                reg_new.put()
-                                key = reg_new.key()
-                                # TODO: Store updated canonical for all registration matches.
+                                if reg_new is not None:
+                                    # update registration entry with canonical id
+                                    reg_new.canonical_id = kv[1]
+                                    reg_new.canonical_updated = datetime.datetime.now()       
+                                    reg_new.put()
     
                 except httplib.HTTPException, e:
                     logging.info("GCM HTTPException: ." + str(e) + " - timeout: " + str(timeout_sec))
@@ -394,14 +399,16 @@ class PostMessage(webapp.RequestHandler):
                 self.resp_simple(0, 'Error=PushServiceFail')
                 return
             
+            # if push service shows unregistered device, save the status
+            if respMessage.find('Error=NotRegistered') != -1:
+                if reg_new is not None:
+                    # update registration entry with canonical id
+                    reg_new.active = False
+                    reg_new.put()
+
             if respMessage.find('Error=') != -1:
                 self.resp_simple(0, (' %s') % respMessage)
                 return
-
-        # NOT IMPLEMENTED PUSH TYPE ===============================================================================
-        else: 
-            self.resp_simple(0, ('Sending to device type %i not yet implemented.' % devtype))
-            return
 
         # END NOTIFY TYPES ===============================================================================
         
@@ -413,7 +420,8 @@ class PostMessage(webapp.RequestHandler):
 
     def resp_simple(self, code, msg):
         self.response.out.write('%s%s' % (struct.pack('!i', code), msg))
-
+        if code == 0:
+            logging.error(msg)
 
 def main():
     application = webapp.WSGIApplication([('/postMessage', PostMessage),

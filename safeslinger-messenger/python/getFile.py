@@ -21,6 +21,7 @@
 # THE SOFTWARE.
 
 import base64
+import logging
 import os
 import struct
 
@@ -124,6 +125,8 @@ class GetFile(webapp.RequestHandler):
 
     def resp_simple(self, code, msg):
         self.response.out.write('%s%s' % (struct.pack('!i', code), msg))
+        if code == 0:
+            logging.error(msg)
 
 def main():
     application = webapp.WSGIApplication([('/getFile', GetFile)],

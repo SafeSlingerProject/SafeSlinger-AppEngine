@@ -20,6 +20,7 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 # THE SOFTWARE.
 
+import logging
 import os
 import struct
 
@@ -127,6 +128,8 @@ class GetMessageNoncesByToken(webapp.RequestHandler):
 
     def resp_simple(self, code, msg):
         self.response.out.write('%s%s' % (struct.pack('!i', code), msg))
+        if code == 0:
+            logging.error(msg)
 
 def main():
     application = webapp.WSGIApplication([('/getMessageNoncesByToken', GetMessageNoncesByToken)],

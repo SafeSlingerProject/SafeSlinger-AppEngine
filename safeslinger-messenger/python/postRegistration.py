@@ -26,14 +26,13 @@ import base64
 import logging
 import os
 import struct
-# crypto
-from Crypto.Signature import PKCS1_v1_5
-from Crypto.Hash import SHA
-from Crypto.PublicKey import RSA
 
 from google.appengine.ext import webapp
 from google.appengine.ext.webapp import util
 
+from Crypto.Hash import SHA
+from Crypto.PublicKey import RSA
+from Crypto.Signature import PKCS1_v1_5
 import registration
 
 
@@ -105,7 +104,7 @@ class PostRegistration(webapp.RequestHandler):
         pos = pos + 4
         
         # additional verifying for self signing
-        if size > pos: # still has data
+        if size > pos:  # still has data
         	lennonce = (struct.unpack("!i", data[pos:(pos + 4)]))[0]
         	pos = pos + 4
         	nonce = str(data[pos:(pos + lennonce)])
@@ -141,8 +140,6 @@ class PostRegistration(webapp.RequestHandler):
         query = registration.Registration.all().order('inserted')
         query.filter('key_id =', keyId)
         num = query.count()
-    
-        # TODO: postRegistration may update same registration with new key ID so we need to update canonical as well.
 
         # key_id exists, submissionToken must match
         if num >= 1:            
@@ -151,7 +148,8 @@ class PostRegistration(webapp.RequestHandler):
             if submissionToken == reg_old.submission_token:
                 # if record exists, update it
                 if reg_old.registration_id == registrationId:
-                    # update time only
+                    # update time and active status only
+                    reg_old.active = True
                     reg_old.put()
                     key = reg_old.key()
                     if not key.has_id_or_name():
@@ -168,7 +166,6 @@ class PostRegistration(webapp.RequestHandler):
 
             # token not authentic, just log it
             else:    
-                # TODO: send support communication                                
                 logging.info('Registration failed: submission token in table %s, not matching submitted submission token %s' % (reg_old.submission_token, submissionToken))
 
         # key_id is new, submissionToken can be inserted instantly
@@ -187,7 +184,8 @@ class PostRegistration(webapp.RequestHandler):
 
     def resp_simple(self, code, msg):
         self.response.out.write('%s%s' % (struct.pack('!i', code), msg))
-
+        if code == 0:
+            logging.error(msg)
 
 def main():
     application = webapp.WSGIApplication([('/postRegistration', PostRegistration)],

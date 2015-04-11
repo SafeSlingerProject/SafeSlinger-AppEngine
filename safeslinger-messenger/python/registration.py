@@ -33,3 +33,4 @@ class Registration(db.Model):
     notify_type = db.IntegerProperty(required=True)
     canonical_id = db.StringProperty()
     canonical_updated = db.DateTimeProperty()
+    active = db.BooleanProperty(required=True, default=True)

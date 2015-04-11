@@ -21,7 +21,6 @@
 # THE SOFTWARE.
 
 import cgi
-import datetime
 import os
 
 from google.appengine.api import users
@@ -30,8 +29,8 @@ from google.appengine.ext.webapp.util import run_wsgi_app
 
 import apnsAuthToken
 import c2dmAuthToken
-import loginGoogle
 import gcmAuthToken 
+import loginGoogle
 
 
 class MainPage(webapp.RequestHandler):

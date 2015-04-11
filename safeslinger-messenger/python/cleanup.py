@@ -28,6 +28,7 @@ from google.appengine.ext.webapp import util
 
 import c2dmAuthToken
 import filestorage
+import registration
 
 
 class CleanUp(webapp.RequestHandler):
@@ -49,14 +50,12 @@ class CleanUp(webapp.RequestHandler):
             downloaded = 0
             pending = 0
             for f in fquery:
-                # remove all attachments after TIMEOUT_DOWN
-                blob_key = f.blobkey
-                # delete blobstore item if exists
-                if blob_key:
-                    blobstore.delete(f.blobkey)
-
                 # remove downloaded after TIMEOUT_DOWN, the rest after TIMEOUT_PEND
                 if f.downloaded or f.inserted < pendlastDate:
+                    blob_key = f.blobkey
+                    # delete blobstore item if exists
+                    if blob_key:
+                        blobstore.delete(f.blobkey)
                     # delete datastore item
                     files.append(f)
                     
@@ -64,6 +63,13 @@ class CleanUp(webapp.RequestHandler):
                         downloaded += 1
                     else:
                         pending += 1
+                        # registration ids past the pending timeout should be marked inactive
+                        rquery = registration.Registration.all().order('-inserted')
+                        rquery.filter('registration_id =', f.sender_token)
+                        reg = rquery.get()  # only want the latest
+                        if (reg is not None) and (reg.active):
+                            reg.active = False
+                            reg.put()
             
             db.delete(files)
             logging.info('cleanup: downloaded=%i, pending=%i' % (downloaded, pending))
@@ -75,7 +81,7 @@ class CleanUp(webapp.RequestHandler):
             for t in tquery:
                 if i >= 10:
                     tokens.append(t)
-                i = i + 1
+                i += 1
             
             db.delete(tokens)
             logging.info('cleanup: old tokens=%i' % (tokens.__len__()))

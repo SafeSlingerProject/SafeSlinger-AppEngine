@@ -20,10 +20,10 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 # THE SOFTWARE.
 
+import httplib
 import logging
 import urllib
 import urllib2
-import httplib
 
 import c2dmAuthToken
 

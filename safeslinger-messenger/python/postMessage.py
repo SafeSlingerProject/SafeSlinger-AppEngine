@@ -170,7 +170,7 @@ class PostMessage(webapp.RequestHandler):
             # determine which storage method to use....
             if lenfd <= DATASTORE_LIMIT:
                 # add file to data base...
-                filestore = filestorage.FileStorage(id=retrievalId, data=fileData, msg=msgData, client_ver=client, sender_token=recipientToken)
+                filestore = filestorage.FileStorage(id=retrievalId, data=fileData, msg=msgData, client_ver=client, sender_token=str(recipientToken))
             else:
                 # Create the file
                 blobName = files.blobstore.create(mime_type='application/octet-stream')        
@@ -189,9 +189,9 @@ class PostMessage(webapp.RequestHandler):
                 blob_key = str(files.blobstore.get_blob_key(blobName)) 
                 # This will only work if the file is less than 10MB. Otherwise, we send a 
                 # correctly encoded multipart form and use the regular blobstore upload method. 
-                filestore = filestorage.FileStorage(id=retrievalId, blobkey=blob_key, msg=msgData, client_ver=client, sender_token=recipientToken)
+                filestore = filestorage.FileStorage(id=retrievalId, blobkey=blob_key, msg=msgData, client_ver=client, sender_token=str(recipientToken))
         else:
-            filestore = filestorage.FileStorage(id=retrievalId, msg=msgData, client_ver=client, sender_token=recipientToken)
+            filestore = filestorage.FileStorage(id=retrievalId, msg=msgData, client_ver=client, sender_token=str(recipientToken))
         
         # save file retrieval data and keys to datastore
         filestore.put()

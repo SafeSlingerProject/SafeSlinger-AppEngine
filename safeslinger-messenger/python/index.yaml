@@ -16,6 +16,11 @@ indexes:
   - name: inserted
     direction: desc
 
+- kind: FileStorage
+  properties:
+  - name: downloaded
+  - name: inserted
+  
 - kind: Registration
   properties:
   - name: registration_id

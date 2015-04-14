@@ -51,7 +51,7 @@ class CleanUp(webapp.RequestHandler):
             pending = 0
             for f in fquery:
                 # remove downloaded after TIMEOUT_DOWN, the rest after TIMEOUT_PEND
-                if f.downloaded or f.inserted < pendlastDate:
+                if (f.downloaded) or (f.inserted < pendlastDate):
                     blob_key = f.blobkey
                     # delete blobstore item if exists
                     if blob_key:
@@ -63,11 +63,13 @@ class CleanUp(webapp.RequestHandler):
                         downloaded += 1
                     else:
                         pending += 1
+                        logging.info('Message pending removed aged: %s' % str(now - f.inserted))
                         # registration ids past the pending timeout should be marked inactive
                         rquery = registration.Registration.all().order('-inserted')
                         rquery.filter('registration_id =', f.sender_token)
                         reg = rquery.get()  # only want the latest
                         if (reg is not None) and (reg.active):
+                            logging.info('Registration marked inactive: (%i)%s...' % (reg.notify_type, reg.registration_id[0:10]))
                             reg.active = False
                             reg.put()
             

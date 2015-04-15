@@ -105,35 +105,35 @@ class PostRegistration(webapp.RequestHandler):
         
         # additional verifying for self signing
         if size > pos:  # still has data
-        	lennonce = (struct.unpack("!i", data[pos:(pos + 4)]))[0]
-        	pos = pos + 4
-        	nonce = str(data[pos:(pos + lennonce)])
-        	pos = pos + lennonce
-        	
-        	lenpubkey = (struct.unpack("!i", data[pos:(pos + 4)]))[0]
-        	pos = pos + 4
-        	pubkey = str(data[pos:(pos + lenpubkey)])
-        	pos = pos + lenpubkey
-        	plain_pos = pos
-        	
-        	sig_len = (struct.unpack("!i", data[pos:(pos + 4)]))[0]
-        	pos = pos + 4
-        	sig = data[pos:(pos + sig_len)]
-        	pos = pos + sig_len
-        	
-        	# signature verification
-        	if lenpubkey > 0:
-        	    # load RSA public key
-        	    rsa_key = RSA.importKey(base64.decodestring(pubkey))
-        	    # verify signature
-        	    h = SHA.new()
-        	    h.update(data[:plain_pos])
-        	    verifier = PKCS1_v1_5.new(rsa_key)
-        	    if verifier.verify(h, sig):
-        	        logging.debug('The signature is authentic. Registration continues.')
-        	    else:
-        	        logging.error('The signature is not authentic. Registration stops.')
-        	        return
+            lennonce = (struct.unpack("!i", data[pos:(pos + 4)]))[0]
+            pos = pos + 4
+            nonce = str(data[pos:(pos + lennonce)])
+            pos = pos + lennonce
+            
+            lenpubkey = (struct.unpack("!i", data[pos:(pos + 4)]))[0]
+            pos = pos + 4
+            pubkey = str(data[pos:(pos + lenpubkey)])
+            pos = pos + lenpubkey
+            plain_pos = pos
+            
+            sig_len = (struct.unpack("!i", data[pos:(pos + 4)]))[0]
+            pos = pos + 4
+            sig = data[pos:(pos + sig_len)]
+            pos = pos + sig_len
+            
+            # signature verification
+            if lenpubkey > 0:
+                # load RSA public key
+                rsa_key = RSA.importKey(base64.decodestring(pubkey))
+                # verify signature
+                h = SHA.new()
+                h.update(data[:plain_pos])
+                verifier = PKCS1_v1_5.new(rsa_key)
+                if verifier.verify(h, sig):
+                    logging.debug('The signature is authentic. Registration continues.')
+                else:
+                    logging.error('The signature is not authentic. Registration stops.')
+                    return
       
         # REGISTRATION STORAGE =============================================
         # check if registration needs to be authenticated before insertion or update

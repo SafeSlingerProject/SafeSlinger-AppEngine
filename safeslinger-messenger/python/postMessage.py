@@ -256,25 +256,25 @@ class PostMessage(webapp.RequestHandler):
             # grab latest proper credential from our cache
             query = apnsAuthToken.APNSAuthToken.all()
             if isProd:
-            	query.filter('lookuptag =', 'production')
+                query.filter('lookuptag =', 'production')
             else:
-            	query.filter('lookuptag =', 'test')
-            	
+                query.filter('lookuptag =', 'test')
+                
             items = query.fetch(1)  # only want the latest
             num = 0
             for credential in items:
-            	APNS_KEY = credential.apnsKey
-            	APNS_CERT = credential.apnsCert
-            	num = num + 1
+                APNS_KEY = credential.apnsKey
+                APNS_CERT = credential.apnsCert
+                num = num + 1
             
             logging.info("retrievalId: " + retrievalId)
             logging.info("recipientToken: " + recipientToken)
             
             apns = None
             if isProd:
-            	apns = APNs(use_sandbox=False, cert_file=APNS_CERT, key_file=APNS_KEY, enhanced=True)
+                apns = APNs(use_sandbox=False, cert_file=APNS_CERT, key_file=APNS_KEY, enhanced=True)
             else:
-            	apns = APNs(use_sandbox=True, cert_file=APNS_CERT, key_file=APNS_KEY, enhanced=True)
+                apns = APNs(use_sandbox=True, cert_file=APNS_CERT, key_file=APNS_KEY, enhanced=True)
             
             # update badge number
             query = filestorage.FileStorage.all()
@@ -306,12 +306,12 @@ class PostMessage(webapp.RequestHandler):
             # 255 None (unknown)
             status = 0
             try:
-            	identifier = random.getrandbits(32)
-            	status = apns.gateway_server.send_notification(recipientToken, payload, identifier=identifier)
+                identifier = random.getrandbits(32)
+                status = apns.gateway_server.send_notification(recipientToken, payload, identifier=identifier)
             except DeadlineExceededError:
-            	logging.info("DeadlineExceededError - timeout.")
-            	self.resp_simple(0, 'Error=PushNotificationFail')
-            	return
+                logging.info("DeadlineExceededError - timeout.")
+                self.resp_simple(0, 'Error=PushNotificationFail')
+                return
                
             # received status from SSL socket, handle appropriately
             if status == 0:
@@ -321,8 +321,8 @@ class PostMessage(webapp.RequestHandler):
                 self.resp_simple(0, 'Error=PushNotificationFail')
                 return
             elif status == 2 or status == 5 or status == 8:
-            	self.resp_simple(0, 'Error=InvalidRegistration')
-            	return
+                self.resp_simple(0, 'Error=InvalidRegistration')
+                return
             else:
                 logging.error("APNS Error: (code = %d)" % status)
                 self.resp_simple(0, 'Error=PushServiceFail')

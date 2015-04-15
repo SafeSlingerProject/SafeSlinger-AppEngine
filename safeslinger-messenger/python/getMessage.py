@@ -93,14 +93,14 @@ class GetMessage(webapp.RequestHandler):
 
         # if found package up file, updated status, and return it
         if num == 1:
-        	item = query.get()
-        	msgData = item.msg
-        	lenmsg = str.__len__(msgData)
-        	self.response.out.write('%s' % struct.pack('!i', server))
-        	self.response.out.write('%s' % (struct.pack('!i', 1)))
-        	self.response.out.write('%s%s' % (struct.pack('!i', lenmsg), msgData))
-        	item.downloaded = True
-        	item.put()
+            item = query.get()
+            msgData = item.msg
+            lenmsg = str.__len__(msgData)
+            self.response.out.write('%s' % struct.pack('!i', server))
+            self.response.out.write('%s' % (struct.pack('!i', 1)))
+            self.response.out.write('%s%s' % (struct.pack('!i', lenmsg), msgData))
+            item.downloaded = True
+            item.put()
         # not found, send back error message
         elif num == 0:            
             self.resp_simple(0, 'Error=MessageNotFound')

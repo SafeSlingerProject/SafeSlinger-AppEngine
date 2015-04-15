@@ -237,7 +237,7 @@ class APNsConnection(object):
                     elif ex.args[0] == SSL_ERROR_WANT_WRITE:
                         sys.exc_clear()
                     else:
-                       raise
+                        raise
         
         self.connection_alive = True
         _logger.debug("%s APNS connection established" % self.__class__.__name__)
@@ -517,32 +517,32 @@ class GatewayConnection(APNsConnection):
             _error = 0 # no errors
             while timeout_tot < 30:
                 try:
-                	with self._send_lock:
-                		timeout_tot += timeout_sec
-                		i += 1
-                		self.write(message)
-                		self._sent_notifications.append(dict({'id': identifier, 'message': message}))
-                		rlist, _, _ = select.select([self._connection()], [], [], WAIT_READ_TIMEOUT_SEC)
-                		if len(rlist) > 0: # there's some data from APNs
-                			self._socket.settimeout(0.1)
-                			buff = self.read(ERROR_RESPONSE_LENGTH)
-                			if len(buff) == ERROR_RESPONSE_LENGTH:
-                				command, status, identifier = unpack(ERROR_RESPONSE_FORMAT, buff)
-                				if 8 == command: # there is error response from APNS
-                					_logger.info("got error-response from APNS: %d" % status)
-                				_error = status
-                		else:
-                			_logger.info("Successfully Sent Notification to APNS.") #DEBUG
-                		self._disconnect()
-                	break
+                    with self._send_lock:
+                        timeout_tot += timeout_sec
+                        i += 1
+                        self.write(message)
+                        self._sent_notifications.append(dict({'id': identifier, 'message': message}))
+                        rlist, _, _ = select.select([self._connection()], [], [], WAIT_READ_TIMEOUT_SEC)
+                        if len(rlist) > 0: # there's some data from APNs
+                            self._socket.settimeout(0.1)
+                            buff = self.read(ERROR_RESPONSE_LENGTH)
+                            if len(buff) == ERROR_RESPONSE_LENGTH:
+                                command, status, identifier = unpack(ERROR_RESPONSE_FORMAT, buff)
+                                if 8 == command: # there is error response from APNS
+                                    _logger.info("got error-response from APNS: %d" % status)
+                                _error = status
+                        else:
+                            _logger.info("Successfully Sent Notification to APNS.") #DEBUG
+                        self._disconnect()
+                    break
                 except socket_error as e:
-                	_error = 10
-                	timeout_sec *= 2
-                	_logger.exception("sending notification with id:" + str(identifier) + 
-                	                  " to APNS failed: " + str(type(e)) + ": " + str(e) + 
-                	                  " in " + str(i+1) + "th attempt, will wait " + str(timeout_sec) + 
-                	                  " secs for next action")
-                	time.sleep(timeout_sec) # wait potential error-response to be read
+                    _error = 10
+                    timeout_sec *= 2
+                    _logger.exception("sending notification with id:" + str(identifier) + 
+                                      " to APNS failed: " + str(type(e)) + ": " + str(e) + 
+                                      " in " + str(i+1) + "th attempt, will wait " + str(timeout_sec) + 
+                                      " secs for next action")
+                    time.sleep(timeout_sec) # wait potential error-response to be read
             return _error
         else:
             self.write(self._get_notification(token_hex, payload))

@@ -32,4 +32,5 @@ class FileStorage(db.Model):
     blobkey = db.ByteStringProperty()
     client_ver = db.IntegerProperty(required=True)
     sender_token = db.ByteStringProperty(indexed=True)
+    notify_type = db.IntegerProperty()
     downloaded = db.BooleanProperty(required=True, default=False)

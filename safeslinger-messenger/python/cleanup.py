@@ -28,6 +28,7 @@ from google.appengine.ext.webapp import util
 
 import c2dmAuthToken
 import filestorage
+import registration
 
 
 class CleanUp(webapp.RequestHandler):
@@ -38,27 +39,39 @@ class CleanUp(webapp.RequestHandler):
         if self.request.headers.get('X-AppEngine-Cron') == 'true':
     
             # delete messages older than 24 hours
-            timeout = 60 * 60 * 24  # 24 hours
-            now = datetime.datetime.now()        
-            deltaMem = datetime.timedelta(seconds=timeout) 
-            thenMem = now - deltaMem        
-            fquery = db.Query(filestorage.FileStorage).filter('inserted <', thenMem)
+            TIMEOUT_DOWN = 60 * 60 * 24  # 24 hours
+            TIMEOUT_PEND = 60 * 60 * 24 * 14  # 2 weeks
+            now = datetime.datetime.now()
+            downLastDate = now - datetime.timedelta(seconds=TIMEOUT_DOWN)
+            pendlastDate = now - datetime.timedelta(seconds=TIMEOUT_PEND)
+            fquery = db.Query(filestorage.FileStorage).filter('inserted <', downLastDate)
             files = []
     
             downloaded = 0
             pending = 0
             for f in fquery:
-                blob_key = f.blobkey
-                # delete blobstore item if exists
-                if blob_key:
-                    blobstore.delete(f.blobkey)
-                # delete datastore item
-                files.append(f)
-                
-                if f.downloaded:
-                    downloaded += 1
-                else:
-                    pending += 1
+                # remove downloaded after TIMEOUT_DOWN, the rest after TIMEOUT_PEND
+                if (f.downloaded) or (f.inserted < pendlastDate):
+                    blob_key = f.blobkey
+                    # delete blobstore item if exists
+                    if blob_key:
+                        blobstore.delete(f.blobkey)
+                    # delete datastore item
+                    files.append(f)
+                    
+                    if f.downloaded:
+                        downloaded += 1
+                    else:
+                        pending += 1
+                        logging.info('Message pending removed aged: %s' % str(now - f.inserted))
+                        # registration ids past the pending timeout should be marked inactive
+                        rquery = registration.Registration.all().order('-inserted')
+                        rquery.filter('registration_id =', f.sender_token)
+                        reg = rquery.get()  # only want the latest
+                        if (reg is not None) and (reg.active):
+                            logging.info('Registration marked inactive: (%i)%s...' % (reg.notify_type, reg.registration_id[0:10]))
+                            reg.active = False
+                            reg.put()
             
             db.delete(files)
             logging.info('cleanup: downloaded=%i, pending=%i' % (downloaded, pending))
@@ -70,7 +83,7 @@ class CleanUp(webapp.RequestHandler):
             for t in tquery:
                 if i >= 10:
                     tokens.append(t)
-                i = i + 1
+                i += 1
             
             db.delete(tokens)
             logging.info('cleanup: old tokens=%i' % (tokens.__len__()))

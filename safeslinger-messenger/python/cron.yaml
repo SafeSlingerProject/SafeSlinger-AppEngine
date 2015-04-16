@@ -1,5 +1,8 @@
 cron:
-- description: Cleanup stale safeslinger messages.
+- description: Cleanup stale messages and mark stale registrations inactive.
   url: /cron/cleanup
   schedule: every 1 hours
+- description: Cleanup duplicate registrations created by concurrency delays.
+  url: /cron/cleanup_reg
+  schedule: every 24 hours
   

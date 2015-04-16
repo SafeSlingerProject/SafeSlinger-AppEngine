@@ -239,7 +239,7 @@ class APNsConnection(object):
                     elif ex.args[0] == SSL_ERROR_WANT_WRITE:
                         sys.exc_clear()
                     else:
-                       raise
+                        raise
         
         self.connection_alive = True
         _logger.debug("%s APNS connection established" % self.__class__.__name__)
@@ -531,31 +531,31 @@ class GatewayConnection(APNsConnection):
             while timeout_tot < 30:
                 try:
                     with self._send_lock:
-                    	timeout_tot += timeout_sec
-                    	i += 1
-                    	#self._make_sure_error_response_handler_worker_alive()
-                    	self.write(message)
-                    	self._sent_notifications.append(dict({'id': identifier, 'message': message}))
-                    	_logger.info("send notification to APNS.")
-                    	
-                    	rlist, _, _ = select.select([self._connection()], [], [], WAIT_READ_TIMEOUT_SEC)
-                    	_logger.info("got response from APNS: %d" % len(rlist))
-                    	if len(rlist) > 0: # there's some data from APNs
-                    		self._socket.settimeout(0.5)
-                    		buff = self.read(ERROR_RESPONSE_LENGTH)
-                    		if len(buff) == ERROR_RESPONSE_LENGTH:
-                    			command, status, identifier = unpack(ERROR_RESPONSE_FORMAT, buff)
-                    			if 8 == command: # there is error response from APNS
-                    				#if self._response_listener:
-                    				#	self._response_listener(Util.convert_error_response_to_dict(error_response))
-                    				_logger.info("got error-response from APNS: %d" % status)
-                    				self._disconnect()
-                    				#self._resend_notifications_by_id(identifier)
-                    		if len(buff) == 0:
-                    			_logger.warning("read socket got 0 bytes data") #DEBUG
-                    			self._disconnect()
-                    	
-                    	_succ = True
+                        timeout_tot += timeout_sec
+                        i += 1
+                        #self._make_sure_error_response_handler_worker_alive()
+                        self.write(message)
+                        self._sent_notifications.append(dict({'id': identifier, 'message': message}))
+                        _logger.info("send notification to APNS.")
+                        
+                        rlist, _, _ = select.select([self._connection()], [], [], WAIT_READ_TIMEOUT_SEC)
+                        _logger.info("got response from APNS: %d" % len(rlist))
+                        if len(rlist) > 0: # there's some data from APNs
+                            self._socket.settimeout(0.5)
+                            buff = self.read(ERROR_RESPONSE_LENGTH)
+                            if len(buff) == ERROR_RESPONSE_LENGTH:
+                                command, status, identifier = unpack(ERROR_RESPONSE_FORMAT, buff)
+                                if 8 == command: # there is error response from APNS
+                                    #if self._response_listener:
+                                    #    self._response_listener(Util.convert_error_response_to_dict(error_response))
+                                    _logger.info("got error-response from APNS: %d" % status)
+                                    self._disconnect()
+                                    #self._resend_notifications_by_id(identifier)
+                            if len(buff) == 0:
+                                _logger.warning("read socket got 0 bytes data") #DEBUG
+                                self._disconnect()
+                        
+                        _succ = True
                     break
                 except socket_error as e:
                     timeout_sec *= 2
@@ -628,15 +628,15 @@ class GatewayConnection(APNsConnection):
 #                     buff = self._apns_connection.read(ERROR_RESPONSE_LENGTH)
 #                     _logger.info("got error-response from APNS:")
 #                     if len(buff) == ERROR_RESPONSE_LENGTH:
-#                     	command, status, identifier = unpack(ERROR_RESPONSE_FORMAT, buff)
-#                     	_logger.info("got response from APNS, code = %d, status = %d" % (command, status))
-#                     	if 8 == command: # there is error response from APNS
-#                     		error_response = (status, identifier)
-#                     		_logger.info("got error-response from APNS:" + str(error_response))
-#                     		self._disconnect()
+#                         command, status, identifier = unpack(ERROR_RESPONSE_FORMAT, buff)
+#                         _logger.info("got response from APNS, code = %d, status = %d" % (command, status))
+#                         if 8 == command: # there is error response from APNS
+#                             error_response = (status, identifier)
+#                             _logger.info("got error-response from APNS:" + str(error_response))
+#                             self._disconnect()
 #                     if len(buff) == 0:
-#                     	_logger.warning("read socket got 0 bytes data") #DEBUG
-#                     	self._disconnect()
+#                         _logger.warning("read socket got 0 bytes data") #DEBUG
+#                         self._disconnect()
 #                     
 #                     # rlist, _, _ = select.select([self._apns_connection._connection()], [], [], WAIT_READ_TIMEOUT_SEC)
 # #                     _logger.info("got response from APNS: %d" % len(rlist))

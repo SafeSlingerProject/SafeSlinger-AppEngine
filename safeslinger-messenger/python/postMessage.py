@@ -33,7 +33,6 @@ import time
 import urllib, urllib2
 
 from google.appengine.api import files
-from google.appengine.api.urlfetch_errors import DeadlineExceededError
 from google.appengine.ext import webapp
 from google.appengine.ext.webapp import util
 from google.appengine.runtime import DeadlineExceededError
@@ -44,7 +43,6 @@ import c2dm
 import c2dmAuthToken
 import filestorage
 import gcmAuthToken
-import json
 import registration
 
 

@@ -52,6 +52,9 @@ handlers:
 - url: /cron/cleanup
   script: cleanup.py
   
+- url: /cron/cleanup_reg
+  script: cleanup_reg.py
+  
 - url: /checkStatus
   script: checkStatus.py
   secure: always

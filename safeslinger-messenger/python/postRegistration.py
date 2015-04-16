@@ -27,12 +27,12 @@ import logging
 import os
 import struct
 
-from google.appengine.ext import webapp
-from google.appengine.ext.webapp import util
-
 from Crypto.Hash import SHA
 from Crypto.PublicKey import RSA
 from Crypto.Signature import PKCS1_v1_5
+from google.appengine.ext import webapp
+from google.appengine.ext.webapp import util
+
 import registration
 
 
@@ -137,7 +137,7 @@ class PostRegistration(webapp.RequestHandler):
       
         # REGISTRATION STORAGE =============================================
         # check if registration needs to be authenticated before insertion or update
-        query = registration.Registration.all().order('inserted')
+        query = registration.Registration.all().order('-inserted')
         query.filter('key_id =', keyId)
         num = query.count()
 
@@ -147,7 +147,7 @@ class PostRegistration(webapp.RequestHandler):
             # token is authentic
             if submissionToken == reg_old.submission_token:
                 # if record exists, update it
-                if reg_old.registration_id == registrationId:
+                if registrationId == reg_old.registration_id:
                     # update time and active status only
                     reg_old.active = True
                     reg_old.put()

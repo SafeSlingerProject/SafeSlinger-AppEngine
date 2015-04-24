@@ -40,12 +40,13 @@ class CleanUp(webapp.RequestHandler):
     
             # delete messages older than 24 hours
             TIMEOUT_DOWN = 60 * 60 * 24  # 24 hours
-            TIMEOUT_PEND = 60 * 60 * 24 * 14  # 2 weeks
+            TIMEOUT_PEND = 60 * 60 * 24 * 28  # 4 weeks
             now = datetime.datetime.now()
             downLastDate = now - datetime.timedelta(seconds=TIMEOUT_DOWN)
             pendlastDate = now - datetime.timedelta(seconds=TIMEOUT_PEND)
             fquery = db.Query(filestorage.FileStorage).filter('inserted <', downLastDate)
             files = []
+            days = [0] * 30
     
             downloaded = 0
             pending = 0
@@ -61,20 +62,29 @@ class CleanUp(webapp.RequestHandler):
                     
                     if f.downloaded:
                         downloaded += 1
+                        age = now - f.inserted
+                        days[age.days] += 1
+                        
                     else:
                         pending += 1
                         logging.info('Message pending removed aged: %s' % str(now - f.inserted))
-                        # registration ids past the pending timeout should be marked inactive
-                        rquery = registration.Registration.all().order('-inserted')
-                        rquery.filter('registration_id =', f.sender_token)
-                        reg = rquery.get()  # only want the latest
-                        if (reg is not None) and (reg.active):
-                            logging.info('Registration marked inactive: (%i)%s...' % (reg.notify_type, reg.registration_id[0:10]))
-                            reg.active = False
-                            reg.put()
+
+                        # TODO: Restore marking inactive when iOS cold boot issue is deployed
+#                         # registration ids past the pending timeout should be marked inactive
+#                         rquery = registration.Registration.all().order('-inserted')
+#                         rquery.filter('registration_id =', f.sender_token)
+#                         reg = rquery.get()  # only want the latest
+#                         if (reg is not None) and (reg.active):
+#                             logging.info('Registration marked inactive: (%i)%s...' % (reg.notify_type, reg.registration_id[0:10]))
+#                             reg.active = False
+#                             reg.put()
             
             db.delete(files)
-            logging.info('cleanup: downloaded=%i, pending=%i' % (downloaded, pending))
+            i = 0
+            for d in days:
+                if d != 0:
+                    logging.info('cleanup: downloaded=%i msgs %i days old' % (d, i))
+                i += 1
     
             # delete old authorization tokens if there are more than 10
             tquery = db.Query(c2dmAuthToken.C2dmAuthToken).order('-inserted')
@@ -86,7 +96,8 @@ class CleanUp(webapp.RequestHandler):
                 i += 1
             
             db.delete(tokens)
-            logging.info('cleanup: old tokens=%i' % (tokens.__len__()))
+            if tokens.__len__() > 0:
+                logging.info('cleanup: old tokens=%i' % (tokens.__len__()))
 
 def main():
     application = webapp.WSGIApplication([('/cron/cleanup', CleanUp)],

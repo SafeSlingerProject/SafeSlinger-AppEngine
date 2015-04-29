@@ -149,11 +149,6 @@ class PostMessage(webapp.RequestHandler):
     
         # otherwise, just use the submitted registration as is
 
-        # inactive registrations should not push to this registration id
-        if not active_reg:
-            self.resp_simple(0, 'Error=InvalidRegistration')
-            return
-        
         # NOT IMPLEMENTED PUSH TYPES ===============================================================================
         if devtype <= 0:
             self.resp_simple(0, 'User has no push registration id.')
@@ -245,6 +240,13 @@ class PostMessage(webapp.RequestHandler):
     
             respMessage = sender.sendMessage()
             
+            # if push service shows unregistered device, save the status
+            if respMessage.find('Error=NotRegistered') != -1:
+                if reg_new is not None:
+                    # update registration entry with canonical id
+                    reg_new.active = False
+                    reg_new.put()
+                    
             if respMessage.find('Error') != -1:
                 self.resp_simple(0, (' %s') % respMessage)
                 return
@@ -310,7 +312,16 @@ class PostMessage(webapp.RequestHandler):
                 logging.info("DeadlineExceededError - timeout.")
                 self.resp_simple(0, 'Error=PushNotificationFail')
                 return
-               
+            
+            # TODO is it too risky to make these inactive given how easy it is to swap prod/test servers during development?    
+#             # if push service shows unregistered device, save the status
+#             # only do this for production devices to avoid conflicts during testing
+#             if status == 8 and isProd:
+#                 if reg_new is not None:
+#                     # update registration entry with canonical id
+#                     reg_new.active = False
+#                     reg_new.put()
+                    
             # received status from SSL socket, handle appropriately
             if status == 0:
                 logging.info("Remote Notification successfully sent to APNS, code: " + str(status))
@@ -411,6 +422,17 @@ class PostMessage(webapp.RequestHandler):
         # END NOTIFY TYPES ===============================================================================
         
         # SUCCESS RESPONSE ===============================================================================
+        
+        # mark push complete to differentiate between inserted data, but failed push
+        filestore.push_accepted = True
+        filestore.put()        
+
+        # inactive registrations should be warned that the message may not arrive
+        # allow push message to attempt delivery, but still send error message back
+        if not active_reg:
+            self.resp_simple(0, 'Error=InvalidRegistration')
+            return
+                        
         # file inserted and message sent
         self.response.out.write('%s' % struct.pack('!i', server))
         self.response.out.write('%s Success: %s' % (struct.pack('!i', 1), respMessage))

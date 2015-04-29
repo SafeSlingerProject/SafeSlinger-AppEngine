@@ -34,3 +34,4 @@ class FileStorage(db.Model):
     sender_token = db.ByteStringProperty(indexed=True)
     notify_type = db.IntegerProperty()
     downloaded = db.BooleanProperty(required=True, default=False)
+    push_accepted = db.BooleanProperty(required=True, default=False)

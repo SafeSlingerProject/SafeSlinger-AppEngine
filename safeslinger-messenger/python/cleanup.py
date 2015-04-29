@@ -71,13 +71,15 @@ class CleanUp(webapp.RequestHandler):
 
                         # TODO: Restore marking inactive when iOS cold boot issue is deployed
 #                         # registration ids past the pending timeout should be marked inactive
-#                         rquery = registration.Registration.all().order('-inserted')
-#                         rquery.filter('registration_id =', f.sender_token)
-#                         reg = rquery.get()  # only want the latest
-#                         if (reg is not None) and (reg.active):
-#                             logging.info('Registration marked inactive: (%i)%s...' % (reg.notify_type, reg.registration_id[0:10]))
-#                             reg.active = False
-#                             reg.put()
+#                         # and only mark them inactive if the initial push message failed
+#                         if (f.push_accepted):
+#                             rquery = registration.Registration.all().order('-inserted')
+#                             rquery.filter('registration_id =', f.sender_token)
+#                             reg = rquery.get()  # only want the latest
+#                             if (reg is not None) and (reg.active):
+#                                 logging.info('Registration marked inactive: (%i)%s...' % (reg.notify_type, reg.registration_id[0:10]))
+#                                 reg.active = False
+#                                 reg.put()
             
             db.delete(files)
             i = 0

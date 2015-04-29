@@ -34,3 +34,4 @@ class Registration(db.Model):
     canonical_id = db.StringProperty()
     canonical_updated = db.DateTimeProperty()
     active = db.BooleanProperty(required=True, default=True)
+    submission_type = db.IntegerProperty(required=True, default=1)

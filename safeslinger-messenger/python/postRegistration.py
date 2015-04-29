@@ -82,6 +82,10 @@ class PostRegistration(webapp.RequestHandler):
 
         server = int(CURRENT_VERSION_ID[0:8], 16)
 
+        #init
+        submissionAuth = None
+        submissionType = 1
+
         # unpack all incoming data, skip client version 
         pos = 4        
 
@@ -94,6 +98,10 @@ class PostRegistration(webapp.RequestHandler):
         pos = pos + 4
         submissionToken = str(data[pos:(pos + lensubtok)])
         pos = pos + lensubtok
+
+        if lensubtok >= 32: # 256-bit original SHA-3 minimum, before base-64 encoding
+            submissionAuth = submissionToken
+            submissionType = 1  # version 1 of authentication
 
         lenregid = (struct.unpack("!i", data[pos:(pos + 4)]))[0]
         pos = pos + 4
@@ -130,6 +138,8 @@ class PostRegistration(webapp.RequestHandler):
                 h.update(data[:plain_pos])
                 verifier = PKCS1_v1_5.new(rsa_key)
                 if verifier.verify(h, sig):
+                    submissionAuth = pubkey
+                    submissionType = 2  # version 2 of authentication
                     logging.debug('The signature is authentic. Registration continues.')
                 else:
                     logging.error('The signature is not authentic. Registration stops.')
@@ -141,15 +151,25 @@ class PostRegistration(webapp.RequestHandler):
         query.filter('key_id =', keyId)
         num = query.count()
 
-        # key_id exists, submissionToken must match
+        # key_id exists, submissionAuth must match
         if num >= 1:            
             reg_old = query.get()  # only want the oldest        
+
+            # follow update logic
+            updateOld = False
+            if submissionType > reg_old.submission_type:
+                updateOld = True  # authentication type upgraded
+            elif submissionAuth == reg_old.submission_token:
+                updateOld = True  # previous authentication matches
+                
             # token is authentic
-            if submissionToken == reg_old.submission_token:
+            if updateOld:
                 # if record exists, update it
                 if registrationId == reg_old.registration_id:
                     # update time and active status only
                     reg_old.active = True
+                    reg_old.submission_token = submissionAuth
+                    reg_old.submission_type = submissionType
                     reg_old.put()
                     key = reg_old.key()
                     if not key.has_id_or_name():
@@ -157,7 +177,7 @@ class PostRegistration(webapp.RequestHandler):
                         return       
                 # if record missing, insert it
                 else:
-                    reg_new = registration.Registration(key_id=keyId, submission_token=submissionToken, registration_id=registrationId, notify_type=devtype, client_ver=client)        
+                    reg_new = registration.Registration(key_id=keyId, submission_token=submissionAuth, submission_type=submissionType, registration_id=registrationId, notify_type=devtype, client_ver=client)        
                     reg_new.put()
                     key = reg_new.key()
                     if not key.has_id_or_name():
@@ -165,12 +185,12 @@ class PostRegistration(webapp.RequestHandler):
                         return       
 
             # token not authentic, just log it
-            else:    
-                logging.info('Registration failed: submission token in table %s, not matching submitted submission token %s' % (reg_old.submission_token, submissionToken))
+            else:
+                logging.info('Registration failed: submission token in table %s, not matching submitted submission token %s' % (reg_old.submission_token[0:30], submissionAuth[0:30]))
 
-        # key_id is new, submissionToken can be inserted instantly
+        # key_id is new, submissionAuth can be inserted instantly
         else:         
-            reg_new = registration.Registration(key_id=keyId, submission_token=submissionToken, registration_id=registrationId, notify_type=devtype, client_ver=client)        
+            reg_new = registration.Registration(key_id=keyId, submission_token=submissionAuth, submission_type=submissionType, registration_id=registrationId, notify_type=devtype, client_ver=client)        
             reg_new.put()
             key = reg_new.key()
             if not key.has_id_or_name():

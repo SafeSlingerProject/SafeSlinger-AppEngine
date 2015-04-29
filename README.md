@@ -1,5 +1,3 @@
-Travis CI Build Status
-
 [![Build Status](https://travis-ci.org/SafeSlingerProject/SafeSlinger-AppEngine.png?branch=master)](https://travis-ci.org/SafeSlingerProject/SafeSlinger-AppEngine)
 
 SafeSlinger App Engine Server

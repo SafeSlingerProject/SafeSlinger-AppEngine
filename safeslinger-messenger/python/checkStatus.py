@@ -22,18 +22,12 @@
 
 from __future__ import with_statement
 
-import base64
 import logging
 import os
 import struct
 
-from google.appengine.api import urlfetch
-from google.appengine.api.urlfetch_errors import DeadlineExceededError
 from google.appengine.ext import webapp
 from google.appengine.ext.webapp import util
-
-import airshipAuthToken
-import json
 
 
 class checkStatus(webapp.RequestHandler):
@@ -93,59 +87,10 @@ class checkStatus(webapp.RequestHandler):
         pos = pos + lenrid
         
         devtype = (struct.unpack("!i", data[pos:(pos + 4)]))[0]
-        
-        # APPLE PUSH MSG ===============================================================================
 
-        # grab latest proper auth token from our cache
-        query = airshipAuthToken.AirshipAuthToken.all()
-        if isProd:
-            query.filter('lookuptag =', 'production')
-        else:
-            query.filter('lookuptag =', 'test')
-
-        items = query.fetch(1)  # only want the latest
-        num = 0
-        for token in items:
-            # Application Key/Secret from UrbanAirship -> App Menu -> App Details to Display
-            UA_API_APPLICATION_KEY = token.appkey 
-            UA_API_APPLICATION_MASTER_SECRET = token.appsecret
-            num = num + 1
-                    
-        pingurl = 'https://go.urbanairship.com/api/device_tokens/'
-        auth_string = 'Basic ' + base64.encodestring('%s:%s' % (UA_API_APPLICATION_KEY, UA_API_APPLICATION_MASTER_SECRET))[:-1]
-        
-        if devtype == 2:
-            # test an iOS token status
-            pingurl = pingurl + str(retrievalToken) + '/'
-            
-            # attempt to retrieve status using exponential backoff timeout
-            timeout_sec = 2
-            timeout_tot = 0
-            url_retry = True
-            while url_retry and timeout_tot < 60:
-                try:
-                    timeout_tot += timeout_sec
-                    ua_data = urlfetch.fetch(pingurl, headers={'content-type': 'application/json', 'authorization' : auth_string}, payload=None, method=urlfetch.GET, deadline=timeout_sec)
-                    url_retry = False
-                except DeadlineExceededError:
-                    logging.info("DeadlineExceededError - timeout: " + str(timeout_sec) + ", url: " + pingurl)
-                    timeout_sec *= 2
-            # received no status, and our retries have exceeded the timeout
-            if url_retry:
-                self.response.out.write('%s' % struct.pack('!i', server))
-                self.response.out.write('%s Unknown status.' % struct.pack('!i', -1))
-                return
-            # received status from fetch, handle appropriately
-            if ua_data.status_code == 200:
-                tokenstatus = json.loads(ua_data.content)
-                if tokenstatus.get('active'):
-                    self.response.out.write('%s' % struct.pack('!i', server))
-                    self.response.out.write('%s Active status.' % struct.pack('!i', 1))
-                else:
-                    self.resp_simple(0, 'Error=InvalidRegistration')
-            else:
-                self.response.out.write('%s' % struct.pack('!i', server))
-                self.response.out.write('%s Unknown status.' % struct.pack('!i', -1))
+        # this has been deprecated, so return unknown status for any legacy calls        
+        self.response.out.write('%s' % struct.pack('!i', server))
+        self.response.out.write('%s Unknown status.' % struct.pack('!i', -1))
 
 
     def resp_simple(self, code, msg):

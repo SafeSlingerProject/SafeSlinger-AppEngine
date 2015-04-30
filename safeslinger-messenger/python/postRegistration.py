@@ -82,7 +82,7 @@ class PostRegistration(webapp.RequestHandler):
 
         server = int(CURRENT_VERSION_ID[0:8], 16)
 
-        #init
+        # init
         submissionAuth = None
         submissionType = 1
 
@@ -99,7 +99,7 @@ class PostRegistration(webapp.RequestHandler):
         submissionToken = str(data[pos:(pos + lensubtok)])
         pos = pos + lensubtok
 
-        if lensubtok >= 32: # 256-bit original SHA-3 minimum, before base-64 encoding
+        if lensubtok >= 32:  # 256-bit original SHA-3 minimum, before base-64 encoding
             submissionAuth = submissionToken
             submissionType = 1  # version 1 of authentication
 

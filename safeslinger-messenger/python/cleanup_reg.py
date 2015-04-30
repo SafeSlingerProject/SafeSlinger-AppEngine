@@ -54,7 +54,7 @@ class CleanUpReg(webapp.RequestHandler):
                 lastRegId = r.registration_id
                 lastKeyId = r.key_id
             
-            #remove duplicates, record our action
+            # remove duplicates, record our action
             db.delete(dup_regs)
             logging.info('cleanup: duplicate reg=%i (total: %i regs, %i keys)' % (duplicate, num, keys.__len__()))
 

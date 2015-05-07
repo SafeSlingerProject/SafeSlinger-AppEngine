@@ -63,6 +63,8 @@ class GetMessageNoncesByToken(webapp.RequestHandler):
 
         # size check
         if size < minlen:
+            logging.debug("in body '%s'" % data)
+            logging.debug("in size %d" % size)
             self.resp_simple(0, 'Request was formatted incorrectly.')
             return
 

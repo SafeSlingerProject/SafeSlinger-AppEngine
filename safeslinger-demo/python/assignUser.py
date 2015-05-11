@@ -20,18 +20,17 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 # THE SOFTWARE.
 
+import base64
+import json
 import logging
 import os
 import random
 import struct
-import json
-import base64
 
 from google.appengine.ext import webapp
 from google.appengine.ext.webapp import util
 
 import member
-
 
 
 class AssignUser(webapp.RequestHandler):
@@ -41,11 +40,12 @@ class AssignUser(webapp.RequestHandler):
     def post(self):
         self.response.headers.add_header("Access-Control-Allow-Origin", "*")
         
-        header = self.request.getheader('Content-Type')
-        if (header == 'application/json'):
-            # set response to json
+        header = self.request.headers['Content-Type']
+        logging.debug("Content-Type: '%s'" % header)
+        if (str(header).startswith('text/plain')):
             self.isJson = True
-            self.response.headers['Content-Type'] = 'application/json'
+            # set response to json
+            self.response.headers['Content-Type'] = 'text/plain'
             data_dict = json.loads(self.request.body)
         else:
             self.response.headers['Content-Type'] = 'application/octet-stream'
@@ -73,7 +73,6 @@ class AssignUser(webapp.RequestHandler):
         minlen = 4 + 32
                 
         # get the data from the post
-        self.response.headers['Content-Type'] = 'application/octet-stream'
         data = self.request.body
         logging.debug("in body '%s'" % data)
     
@@ -86,11 +85,13 @@ class AssignUser(webapp.RequestHandler):
          
         # unpack all incoming data
         server = int(CURRENT_VERSION_ID[0:8], 16)
+        
         if self.isJson:
-            client = data_dict['ver_client']
+            client = int(data_dict['ver_client'], 10)
         else:
             client = (struct.unpack("!i", data[0:4]))[0]
         logging.debug("in client %d" % client)
+        
         if self.isJson:
             commit = base64.decodestring(data_dict['commit_b64'])
         else:
@@ -171,7 +172,7 @@ class AssignUser(webapp.RequestHandler):
         
     def resp_simple(self, code, msg):
         if self.isJson:            
-            json.dump({"code":code, "msg":msg}, self.response.out)
+            json.dump({"err_code":code, "err_msg":msg}, self.response.out)
         else:
             self.response.out.write('%s%s' % (struct.pack('!i', code), msg))
         logging.debug("out error code %i" % code)

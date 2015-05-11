@@ -20,6 +20,8 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 # THE SOFTWARE.
 
+import base64
+import json
 import logging
 import os
 import struct
@@ -32,9 +34,21 @@ import member
 
 class SyncUsers(webapp.RequestHandler):
    
+    isJson = False
+   
     def post(self):
         self.response.headers.add_header("Access-Control-Allow-Origin", "*")
-
+        
+        header = self.request.headers['Content-Type']
+        logging.debug("Content-Type: '%s'" % header)
+        if (str(header).startswith('text/plain')):
+            self.isJson = True
+            # set response to json
+            self.response.headers['Content-Type'] = 'text/plain'
+            data_dict = json.loads(self.request.body)
+        else:
+            self.response.headers['Content-Type'] = 'application/octet-stream'
+            
         STR_VERSERVER = '01060000'
         INT_VERCLIENT = 0x01060000
         STR_VERCLIENT = '1.6'
@@ -58,7 +72,6 @@ class SyncUsers(webapp.RequestHandler):
         minlen = 4 + 4 + 4 + 4 + 4
                 
         # get the data from the post
-        self.response.headers['Content-Type'] = 'application/octet-stream'
         data = self.request.body
         logging.debug("in body '%s'" % data)
     
@@ -71,36 +84,64 @@ class SyncUsers(webapp.RequestHandler):
          
         # unpack all incoming data
         server = int(CURRENT_VERSION_ID[0:8], 16)
-        client = (struct.unpack("!i", data[0:4]))[0]
+ 
+        if self.isJson:
+            client = int(data_dict['ver_client'], 10)
+        else:
+            client = (struct.unpack("!i", data[0:4]))[0]
         logging.debug("in client %d" % client)
-        data = data[4:]
-
-        usrids = []
-        usrid = (struct.unpack("!i", data[0:4]))[0]
+ 
+        if self.isJson:
+            usrid = int(data_dict['usrid'], 10)
+        else:
+            usrid = (struct.unpack("!i", data[4:8]))[0]
         logging.debug("in usrid %d" % usrid)
-        usridlink = (struct.unpack("!i", data[4:8]))[0]
+ 
+        if self.isJson:
+            usridlink = int(data_dict['usridlink'], 10)
+        else:
+            usridlink = (struct.unpack("!i", data[8:12]))[0]
         logging.debug("in usridlink %d" % usridlink)
-        numEntry = (struct.unpack("!i", data[8:12]))[0]
+
+        if self.isJson:
+            numEntry = data_dict['usrids'].__len__()
+        else:
+            numEntry = (struct.unpack("!i", data[12:16]))[0]
         logging.debug("in numEntry %d" % numEntry)
-        data = data[12:]
+ 
         expectedsize = 4 + 4 + 4 + 4 + (4 * numEntry)
 
         # append enough entries to hold the expected data
+        usrids = []
+        pos = 16
+        i = 0
         while numEntry > len(usrids):
-            usrids.append(struct.unpack("!i", data[0:4])[0])
-            logging.debug("in usrid known %i" % struct.unpack("!i", data[0:4]))
-            data = data[4:]
- 
+            if self.isJson:
+                otherid = int(data_dict['usrids'][i], 10)
+                i += 1
+            else:
+                otherid = struct.unpack("!i", data[pos:pos + 4])[0]
+                pos += 4
+            usrids.append(otherid)
+            logging.debug("in usrid known %i" % struct.unpack("!i", otherid))
 
+        postSig = False
+        if self.isJson:
+            cstr = data_dict['commit_b64']
+            if cstr is not None:
+                commit = base64.decodestring(cstr)
+                postSig = True
+        else:
+            if size > expectedsize:
+                commit = data
+                postSig = True
+        if postSig:
+            logging.debug("in commitment '%s'" % commit)
+            
         # client version check
         if client < INT_VERCLIENT:
             self.resp_simple(0, ('Client version mismatch; %s required.  Download latest client release first.' % STR_VERCLIENT))
             return        
-
-        postSig = False
-        if size > expectedsize:
-            postSig = True
-            logging.debug("in commitment '%s'" % data)
                     
         # verify you have an existing user
         query = member.Member.all()
@@ -183,7 +224,10 @@ class SyncUsers(webapp.RequestHandler):
         
 
     def resp_simple(self, code, msg):
-        self.response.out.write('%s%s' % (struct.pack('!i', code), msg))
+        if self.isJson:            
+            json.dump({"err_code":code, "err_msg":msg}, self.response.out)
+        else:
+            self.response.out.write('%s%s' % (struct.pack('!i', code), msg))
         logging.debug("out error code %i" % code)
         logging.debug("out error msg '%s'" % msg)
     

@@ -123,13 +123,12 @@ class SyncUsers(webapp.RequestHandler):
                 otherid = struct.unpack("!i", data[pos:pos + 4])[0]
                 pos += 4
             usrids.append(otherid)
-            logging.debug("in usrid known %i" % struct.unpack("!i", otherid))
+            logging.debug("in usrid known %i" % otherid)
 
         postSig = False
         if self.isJson:
-            cstr = data_dict['commit_b64']
-            if cstr is not None:
-                commit = base64.decodestring(cstr)
+            if 'commit_b64' in data_dict:
+                commit = base64.decodestring(data_dict['commit_b64'])
                 postSig = True
         else:
             if size > expectedsize:
@@ -173,7 +172,8 @@ class SyncUsers(webapp.RequestHandler):
             mems = query.fetch(1000)
 
             # version
-            self.response.out.write('%s' % struct.pack('!i', server))
+            if not self.isJson:
+                self.response.out.write('%s' % struct.pack('!i', server))
             logging.debug("out server %i" % server)
 
             # lowest client version
@@ -181,31 +181,35 @@ class SyncUsers(webapp.RequestHandler):
             q.filter('usr_id_link =', usridlink)
             m = q.fetch(1000)
             low_client = self.getLowestVersion(m)
-            self.response.out.write('%s' % struct.pack('!i', low_client))
+            if not self.isJson:
+                self.response.out.write('%s' % struct.pack('!i', low_client))
             logging.debug("out low_client %i" % low_client)
 
             # grand total
-            num = 0
+            total = 0
             for mem in mems:
                 if mem.commitment != None:
-                    num = num + 1
+                    total = total + 1
             
-            self.response.out.write('%s' % struct.pack('!i', num))
-            logging.debug("out total commits %i" % num)
+            if not self.isJson:
+                self.response.out.write('%s' % struct.pack('!i', total))
+            logging.debug("out total commits %i" % total)
       
             # add delta ids total
-            num = 0
+            delta = 0
             for mem in mems:
                 posted = False
                 for known in usrids:
                     if known == mem.usr_id:
                         posted = True                    
                 if (not posted) & (mem.commitment != None):
-                    num = num + 1
+                    delta = delta + 1
             
-            self.response.out.write('%s' % struct.pack('!i', num))
-            logging.debug("out delta commits %i" % num)
+            if not self.isJson:
+                self.response.out.write('%s' % struct.pack('!i', delta))
+            logging.debug("out delta commits %i" % delta)
     
+            deltas = []
             for mem in mems:
                 posted = False
                 for known in usrids:
@@ -213,7 +217,10 @@ class SyncUsers(webapp.RequestHandler):
                         posted = True                    
                 if (not posted) & (mem.commitment != None):
                     length = str.__len__(mem.commitment)
-                    self.response.out.write('%s%s' % (struct.pack('!ii', mem.usr_id, length), mem.commitment))
+                    if self.isJson:            
+                        deltas.append({'usrid' : mem.usr_id, 'commit_b64' : base64.encodestring(mem.commitment) })
+                    else:
+                        self.response.out.write('%s%s' % (struct.pack('!ii', mem.usr_id, length), mem.commitment))
                     logging.debug("out mem.usr_id %i" % mem.usr_id)
                     logging.debug("out mem.commitment length %i" % length)
                     logging.debug("out mem.commitment '%s'" % mem.commitment)
@@ -222,6 +229,10 @@ class SyncUsers(webapp.RequestHandler):
             self.resp_simple(0, ' user %i does not exist' % (usrid))
             return       
         
+        
+        if self.isJson:            
+            json.dump({"ver_server":server, "ver_low_client":low_client, "com_total":total, "com_deltas":deltas, }, self.response.out)
+
 
     def resp_simple(self, code, msg):
         if self.isJson:            

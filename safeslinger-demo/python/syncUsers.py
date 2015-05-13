@@ -218,7 +218,7 @@ class SyncUsers(webapp.RequestHandler):
                 if (not posted) & (mem.commitment != None):
                     length = str.__len__(mem.commitment)
                     if self.isJson:            
-                        deltas.append({'usrid' : mem.usr_id, 'commit_b64' : base64.encodestring(mem.commitment) })
+                        deltas.append({'usrid' : str(mem.usr_id), 'commit_b64' : base64.encodestring(mem.commitment) })
                     else:
                         self.response.out.write('%s%s' % (struct.pack('!ii', mem.usr_id, length), mem.commitment))
                     logging.debug("out mem.usr_id %i" % mem.usr_id)
@@ -231,12 +231,12 @@ class SyncUsers(webapp.RequestHandler):
         
         
         if self.isJson:            
-            json.dump({"ver_server":server, "ver_low_client":low_client, "com_total":total, "com_deltas":deltas, }, self.response.out)
+            json.dump({"ver_server":str(server), "ver_low_client":str(low_client), "com_total":str(total), "com_deltas":deltas }, self.response.out)
 
 
     def resp_simple(self, code, msg):
         if self.isJson:            
-            json.dump({"err_code":code, "err_msg":msg}, self.response.out)
+            json.dump({"err_code":str(code), "err_msg":str(msg)}, self.response.out)
         else:
             self.response.out.write('%s%s' % (struct.pack('!i', code), msg))
         logging.debug("out error code %i" % code)

@@ -167,12 +167,12 @@ class AssignUser(webapp.RequestHandler):
         logging.debug("out usrid %i" % usrid)
 
         if self.isJson:            
-            json.dump({"ver_server":server, "usrid":usrid}, self.response.out)
+            json.dump({"ver_server":str(server), "usrid":str(usrid)}, self.response.out)
         
         
     def resp_simple(self, code, msg):
         if self.isJson:            
-            json.dump({"err_code":code, "err_msg":msg}, self.response.out)
+            json.dump({"err_code":str(code), "err_msg":str(msg)}, self.response.out)
         else:
             self.response.out.write('%s%s' % (struct.pack('!i', code), msg))
         logging.debug("out error code %i" % code)

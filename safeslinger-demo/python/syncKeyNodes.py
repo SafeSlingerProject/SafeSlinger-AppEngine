@@ -20,6 +20,8 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 # THE SOFTWARE.
 
+import base64
+import json
 import logging
 import os
 import struct
@@ -32,9 +34,21 @@ import member
 
 class SyncKeyNodes(webapp.RequestHandler):
 
+    isJson = False
+   
     def post(self):
         self.response.headers.add_header("Access-Control-Allow-Origin", "*")
-
+        
+        header = self.request.headers['Content-Type']
+        logging.debug("Content-Type: '%s'" % header)
+        if (str(header).startswith('text/plain')):
+            self.isJson = True
+            # set response to json
+            self.response.headers['Content-Type'] = 'text/plain'
+            data_dict = json.loads(self.request.body)
+        else:
+            self.response.headers['Content-Type'] = 'application/octet-stream'
+            
         STR_VERSERVER = '01060000'
         INT_VERCLIENT = 0x01060000
         STR_VERCLIENT = '1.6'
@@ -58,7 +72,6 @@ class SyncKeyNodes(webapp.RequestHandler):
         minlen = 4 + 4
                 
         # get the data from the post
-        self.response.headers['Content-Type'] = 'application/octet-stream'
         data = self.request.body
         logging.debug("in body '%s'" % data)
     
@@ -71,20 +84,35 @@ class SyncKeyNodes(webapp.RequestHandler):
          
         # unpack all incoming data
         server = int(CURRENT_VERSION_ID[0:8], 16)
-        client = (struct.unpack("!i", data[0:4]))[0]
-        logging.debug("in size %d" % size)
-        usrid = (struct.unpack("!i", data[4:8]))[0]
+        
+        if self.isJson:
+            client = int(data_dict['ver_client'], 10)
+        else:
+            client = (struct.unpack("!i", data[0:4]))[0]
+        logging.debug("in client %d" % client)
+ 
+        if self.isJson:
+            usrid = int(data_dict['usrid'], 10)
+        else:
+            usrid = (struct.unpack("!i", data[4:8]))[0]
         logging.debug("in usrid %d" % usrid)
-        data = data[8:]
+        
         expectedsize = 4 + 4
 
         postKeyNodes = False
         if size > expectedsize:
-            usridpost = (struct.unpack("!i", data[0:4]))[0]
+            if self.isJson:
+                usridpost = int(data_dict['usridpost'], 10)
+            else:
+                usridpost = (struct.unpack("!i", data[8:12]))[0]
             logging.debug("in usridpost %i" % usridpost)
-            sizeData = (struct.unpack("!i", data[4:8]))[0]
-            logging.debug("in sizeData %i" % sizeData)
-            key_node = (struct.unpack(str(sizeData) + "s", data[8:8 + sizeData]))[0]
+        
+            if self.isJson:
+                key_node = base64.decodestring(data_dict['keynode_b64'])
+            else:
+                sizeData = (struct.unpack("!i", data[12:16]))[0]
+                logging.debug("in sizeData %i" % sizeData)
+                key_node = (struct.unpack(str(sizeData) + "s", data[16:16 + sizeData]))[0]            
             logging.debug("in key_node '%s'" % key_node)
             postKeyNodes = True
  
@@ -117,38 +145,46 @@ class SyncKeyNodes(webapp.RequestHandler):
                         self.resp_simple(0, 'Unable to update user.')
                         return       
                 else:
-                    self.resp_simple(0, ' user %i does not exist for update' % (usridpost))
+                    self.resp_simple(0, 'user %i does not exist for update' % (usridpost))
                     return   
                                 
             # version
-            self.response.out.write('%s' % struct.pack('!i', server))
+            if not self.isJson:
+                self.response.out.write('%s' % struct.pack('!i', server))
             logging.debug("out server %i" % server)
 
             # node data
             mem = query.get()
             if mem.key_node != None:
-                # n results
-                self.response.out.write('%s' % struct.pack('!i', num))
+                if not self.isJson:
+                    self.response.out.write('%s' % struct.pack('!i', num))
                 logging.debug("out total key_nodes %i" % num)
                 length = str.__len__(mem.key_node)
-                self.response.out.write('%s%s' % (struct.pack('!i', length), mem.key_node))                    
+                if self.isJson:            
+                    json.dump({"ver_server":str(server), "node_total":str(num), "keynode_b64":base64.encodestring(mem.key_node) }, self.response.out)
+                else:
+                    self.response.out.write('%s%s' % (struct.pack('!i', length), mem.key_node))                    
                 logging.debug("out mem.key_node length %i" % length)
                 logging.debug("out mem.key_node '%s'" % mem.key_node)
             else:
-                # n results
-                self.response.out.write('%s' % struct.pack('!i', 0))
+                if self.isJson:            
+                    json.dump({"ver_server":str(server), "node_total":str(0) }, self.response.out)
+                else:
+                    self.response.out.write('%s' % struct.pack('!i', 0))
                 logging.debug("out total key_nodes %i" % 0)
-
         
         else:
-            self.resp_simple(0, ' user %i does not exist' % (usrid))
+            self.resp_simple(0, 'user %i does not exist' % (usrid))
             return      
-        
+    
 
     def resp_simple(self, code, msg):
-        self.response.out.write('%s%s' % (struct.pack('!i', code), msg))
-        logging.debug("out error code %i" % code)
-        logging.debug("out error msg '%s'" % msg)
+        if self.isJson:            
+            json.dump({"err_code":str(code), "err_msg":str(msg)}, self.response.out)
+        else:
+            self.response.out.write('%s%s' % (struct.pack('!i', code), msg))
+        if code == 0:
+            logging.error(msg)
 
 
 def main():

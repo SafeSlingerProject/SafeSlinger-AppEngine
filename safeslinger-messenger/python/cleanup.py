@@ -47,12 +47,12 @@ class CleanUp(webapp.RequestHandler):
             fquery = db.Query(filestorage.FileStorage).filter('inserted <', downLastDate)
             files = []
             days = [0] * 30
-    
+        
             downloaded = 0
-            pending = 0
+            undeliverable = 0
             for f in fquery:
-                # remove downloaded after TIMEOUT_DOWN, the rest after TIMEOUT_PEND
-                if (f.downloaded) or (f.inserted < pendlastDate):
+                # remove downloaded after TIMEOUT_DOWN, or failed pushes, and the rest after TIMEOUT_PEND
+                if (f.downloaded) or (not f.push_accepted) or (f.inserted < pendlastDate):
                     blob_key = f.blobkey
                     # delete blobstore item if exists
                     if blob_key:
@@ -65,21 +65,24 @@ class CleanUp(webapp.RequestHandler):
                         age = now - f.inserted
                         days[age.days] += 1
                         
+                    elif not f.push_accepted:
+                        undeliverable += 1
+                        
                     else:
-                        pending += 1
-                        logging.info('Message pending removed aged: %s' % str(now - f.inserted))
-
-                        # TODO: Restore marking inactive when iOS cold boot issue is deployed
-#                         # registration ids past the pending timeout should be marked inactive
-#                         # and only mark them inactive if the initial push message failed
-#                         if (f.push_accepted):
-#                             rquery = registration.Registration.all().order('-inserted')
-#                             rquery.filter('registration_id =', f.sender_token)
-#                             reg = rquery.get()  # only want the latest
-#                             if (reg is not None) and (reg.active):
-#                                 logging.info('Registration marked inactive: (%i)%s...' % (reg.notify_type, reg.registration_id[0:10]))
-#                                 reg.active = False
-#                                 reg.put()
+                        # TODO: Restore marking iOS inactive when iOS cold boot issue is deployed
+                        if (f.notify_type is not 2):
+                            # registration ids past the pending timeout should be marked inactive
+                            # and only mark them inactive if the initial push message failed
+                            rquery = registration.Registration.all().order('-inserted')
+                            rquery.filter('registration_id =', f.sender_token)
+                            reg = rquery.get()  # only want the latest
+                            if (reg is not None) and (reg.active):
+                                logging.info('Registration marked inactive: (%i)%s... k:%s...' % (reg.notify_type, reg.registration_id[0:10], reg.key_id[0:10]))
+                                reg.active = False
+                                reg.put()
+                                
+                            # only log push accepted messages removed, others would error out
+                            logging.info('Message pending removed aged: %s' % str(now - f.inserted))
             
             db.delete(files)
             i = 0
@@ -87,7 +90,9 @@ class CleanUp(webapp.RequestHandler):
                 if d != 0:
                     logging.info('cleanup: downloaded=%i msgs %i days old' % (d, i))
                 i += 1
-    
+            if undeliverable > 0:
+                logging.info('cleanup: undeliverable=%i msgs' % undeliverable)
+            
             # delete old authorization tokens if there are more than 10
             tquery = db.Query(c2dmAuthToken.C2dmAuthToken).order('-inserted')
             tokens = []

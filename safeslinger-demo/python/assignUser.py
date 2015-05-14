@@ -20,6 +20,8 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 # THE SOFTWARE.
 
+import base64
+import json
 import logging
 import os
 import random
@@ -33,9 +35,21 @@ import member
 
 class AssignUser(webapp.RequestHandler):
    
+    isJson = False
+   
     def post(self):
         self.response.headers.add_header("Access-Control-Allow-Origin", "*")
-
+        
+        header = self.request.headers['Content-Type']
+        logging.debug("Content-Type: '%s'" % header)
+        if (str(header).startswith('text/plain')):
+            self.isJson = True
+            # set response to json
+            self.response.headers['Content-Type'] = 'text/plain'
+            data_dict = json.loads(self.request.body)
+        else:
+            self.response.headers['Content-Type'] = 'application/octet-stream'
+            
         STR_VERSERVER = '01060000'
         INT_VERCLIENT = 0x01060000
         STR_VERCLIENT = '1.6'
@@ -59,7 +73,6 @@ class AssignUser(webapp.RequestHandler):
         minlen = 4 + 32
                 
         # get the data from the post
-        self.response.headers['Content-Type'] = 'application/octet-stream'
         data = self.request.body
         logging.debug("in body '%s'" % data)
     
@@ -72,10 +85,18 @@ class AssignUser(webapp.RequestHandler):
          
         # unpack all incoming data
         server = int(CURRENT_VERSION_ID[0:8], 16)
-        client = (struct.unpack("!i", data[0:4]))[0]
+        
+        if self.isJson:
+            client = int(data_dict['ver_client'], 10)
+        else:
+            client = (struct.unpack("!i", data[0:4]))[0]
         logging.debug("in client %d" % client)
-        data = data[4:]
-        logging.debug("in commitment '%s'" % data)
+        
+        if self.isJson:
+            commit = base64.decodestring(data_dict['commit_b64'])
+        else:
+            commit = data[4:]
+        logging.debug("in commitment '%s'" % commit)
  
         # client version check
         if client < INT_VERCLIENT:
@@ -103,7 +124,7 @@ class AssignUser(webapp.RequestHandler):
                 used.append(m.usr_id)
                 
                 # each commitment must be unique
-                if str(m.commitment) == str(data):
+                if str(m.commitment) == str(commit):
                     self.resp_simple(0, 'Request was formatted incorrectly.')
                     return        
 
@@ -128,7 +149,7 @@ class AssignUser(webapp.RequestHandler):
                 logging.info("found duplicate usr_id=" + str(usrid) + ", retrying...")
  
         # return the user id
-        mem = member.Member(usr_id=usrid, commitment=data, client_ver=client)
+        mem = member.Member(usr_id=usrid, commitment=commit, client_ver=client)
         mem.put()
         key = mem.key()
         if not key.has_id_or_name():
@@ -136,17 +157,26 @@ class AssignUser(webapp.RequestHandler):
             return       
                               
         # version
-        self.response.out.write('%s' % struct.pack('!i', server))
+        if not self.isJson:
+            self.response.out.write('%s' % struct.pack('!i', server))
         logging.debug("out server %i" % server)
 
         # user id assigned
-        self.response.out.write('%s' % struct.pack('!i', usrid))
+        if not self.isJson:
+            self.response.out.write('%s' % struct.pack('!i', usrid))
         logging.debug("out usrid %i" % usrid)
 
+        if self.isJson:            
+            json.dump({"ver_server":str(server), "usrid":str(usrid)}, self.response.out)
+        
+        
     def resp_simple(self, code, msg):
-        self.response.out.write('%s%s' % (struct.pack('!i', code), msg))
-        logging.debug("out error code %i" % code)
-        logging.debug("out error msg '%s'" % msg)
+        if self.isJson:            
+            json.dump({"err_code":str(code), "err_msg":str(msg)}, self.response.out)
+        else:
+            self.response.out.write('%s%s' % (struct.pack('!i', code), msg))
+        if code == 0:
+            logging.error(msg)
     
 
 def main():

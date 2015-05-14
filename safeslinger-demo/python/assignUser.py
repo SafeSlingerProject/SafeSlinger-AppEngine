@@ -175,8 +175,8 @@ class AssignUser(webapp.RequestHandler):
             json.dump({"err_code":str(code), "err_msg":str(msg)}, self.response.out)
         else:
             self.response.out.write('%s%s' % (struct.pack('!i', code), msg))
-        logging.debug("out error code %i" % code)
-        logging.debug("out error msg '%s'" % msg)
+        if code == 0:
+            logging.error(msg)
     
 
 def main():

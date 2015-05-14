@@ -108,12 +108,12 @@ class SyncUsers(webapp.RequestHandler):
         else:
             numEntry = (struct.unpack("!i", data[12:16]))[0]
         logging.debug("in numEntry %d" % numEntry)
+        pos = 16
  
         expectedsize = 4 + 4 + 4 + 4 + (4 * numEntry)
 
         # append enough entries to hold the expected data
         usrids = []
-        pos = 16
         i = 0
         while numEntry > len(usrids):
             if self.isJson:
@@ -125,16 +125,16 @@ class SyncUsers(webapp.RequestHandler):
             usrids.append(otherid)
             logging.debug("in usrid known %i" % otherid)
 
-        postSig = False
+        postSelf = False
         if self.isJson:
             if 'commit_b64' in data_dict:
                 commit = base64.decodestring(data_dict['commit_b64'])
-                postSig = True
+                postSelf = True
         else:
             if size > expectedsize:
-                commit = data
-                postSig = True
-        if postSig:
+                commit = data[pos:]
+                postSelf = True
+        if postSelf:
             logging.debug("in commitment '%s'" % commit)
             
         # client version check
@@ -152,7 +152,7 @@ class SyncUsers(webapp.RequestHandler):
             mem = query.get()
             
             # commit to group number
-            if postSig:            
+            if postSelf:            
                 mem.usr_id_link = usridlink
                 mem.put()
                 key = mem.key()
@@ -226,10 +226,9 @@ class SyncUsers(webapp.RequestHandler):
                     logging.debug("out mem.commitment '%s'" % mem.commitment)
         
         else:
-            self.resp_simple(0, ' user %i does not exist' % (usrid))
+            self.resp_simple(0, 'user %i does not exist' % (usrid))
             return       
-        
-        
+                
         if self.isJson:            
             json.dump({"ver_server":str(server), "ver_low_client":str(low_client), "com_total":str(total), "com_deltas":deltas }, self.response.out)
 
@@ -239,8 +238,8 @@ class SyncUsers(webapp.RequestHandler):
             json.dump({"err_code":str(code), "err_msg":str(msg)}, self.response.out)
         else:
             self.response.out.write('%s%s' % (struct.pack('!i', code), msg))
-        logging.debug("out error code %i" % code)
-        logging.debug("out error msg '%s'" % msg)
+        if code == 0:
+            logging.error(msg)
     
 
     def getLowestVersion(self, mems):

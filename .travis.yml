@@ -5,6 +5,6 @@ python:
 
 before_script:
   - wget https://commondatastorage.googleapis.com/appengine-sdks/featured/google_appengine_1.9.21.zip -nv
-  - unzip -q google_appengine_1.9.19.zip
+  - unzip -q google_appengine_1.9.21.zip
 
 script: nosetests

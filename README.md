@@ -1,26 +1,18 @@
 [![Build Status](https://travis-ci.org/SafeSlingerProject/SafeSlinger-AppEngine.png?branch=master)](https://travis-ci.org/SafeSlingerProject/SafeSlinger-AppEngine)
 
-SafeSlinger App Engine Server
-===================
-The open source SafeSlinger Exchange library is a secure and easy to use method of exchanging public keys or other authentication data, with strong protection from Man-In-The-Middle (MITM) attacks. Our goal is to make exchanging public keys as simple as possible without sacrificing security. Our [research paper](http://sparrow.ece.cmu.edu/group/pub/farb_safeslinger_mobicom2013.pdf), presented at MobiCom '13, provides a technical analysis of SafeSlinger's key exchange properties.
+Quick Links:
+[Downloads](https://github.com/SafeSlingerProject/SafeSlinger-Media/wiki/Platforms),
+[Wiki](https://github.com/SafeSlingerProject/SafeSlinger-Media/wiki),
+[Support, Translations, Contributing](https://github.com/SafeSlingerProject/SafeSlinger-Media/wiki/Contributing),
+[Research Paper](http://sparrow.ece.cmu.edu/group/pub/farb_safeslinger_mobicom2013.pdf),
+[Project Website](http://www.cylab.cmu.edu/safeslinger)
 
-Library Features:
-
-- Open source makes security audits easy.
-- The only secure simultaneous key exchange for up to 10 people.
-- Easy to implement and use.
-- Cross-platform Android and iOS.
-- Protection from Man-In-The-Middle attacks during key exchanges.
-- Exchange keys either in person or remote.
-
-The SafeSlinger secure key exchange is implemented cross-platform for [Android](http://github.com/SafeSlingerProject/SafeSlinger-Android) and [iOS](http://github.com/SafeSlingerProject/SafeSlinger-iOS) devices. Keys are exchanged using a simple server implementation on [App Engine](http://github.com/SafeSlingerProject/SafeSlinger-AppEngine).
-
-Repository App Engine Projects
+App Engine Server Projects
 =======
 
-- **/safeslinger-demo/python** contains a demo SafeSlinger Exchange server you can implement with Google App Engine for your own projects.
-- **/safeslinger-exchange/python** contains the production server source code for the Sling Keys process to securely exchange keys when using the SafeSlinger Messenger application.
-- **/safeslinger-messenger/python** contains the production server source code for sending and receiving messages for the [Android SafeSlinger Messenger](http://play.google.com/store/apps/details?id=edu.cmu.cylab.starslinger) and [iOS SafeSlinger Messenger](http://itunes.apple.com/app/safeslinger/id493529867) client applications.
+- **/safeslinger-demo/python** Contains a demo SafeSlinger Exchange server you can implement with Google App Engine for your own projects.
+- **/safeslinger-exchange/python** Contains the production server source code for the Sling Keys process to securely exchange keys when using the SafeSlinger Messenger application.
+- **/safeslinger-messenger/python** Contains the production server source code for sending and receiving messages for the [Android SafeSlinger Messenger](http://play.google.com/store/apps/details?id=edu.cmu.cylab.starslinger) and [iOS SafeSlinger Messenger](http://itunes.apple.com/app/safeslinger/id493529867) client applications.
 
 Build Your Own Secure Exchange Server
 ========
@@ -33,20 +25,12 @@ To build your own secure exchange server using App Engine:
 6. Click on the **Create Application** button.
 7. Next, edit the source code from the **/safeslinger-demo/python** folder to use the new application identifier you just created in the `app.yaml` file. Change the line `application: slinger-demo` to `application: `**mynewapplicationidentifierfromstep1**. 
 8. Deploy your new application after reading up on [Uploading Your Application](http://developers.google.com/appengine/docs/python/gettingstartedpython27/uploading).
-  
-Contact
-=======
-
-* SafeSlinger [Project Website](http://www.cylab.cmu.edu/safeslinger)
-* Please submit [Bug Reports](http://github.com/SafeSlingerProject/SafeSlinger-AppEngine/issues)!
-* Looking for answers, try our [FAQ](http://www.cylab.cmu.edu/safeslinger/faq.html)!
-* Support: <safeslingerapp@gmail.com>
 
 License
 =======
 	The MIT License (MIT)
 
-	Copyright (c) 2010-2014 Carnegie Mellon University
+	Copyright (c) 2010-2015 Carnegie Mellon University
 
 	Permission is hereby granted, free of charge, to any person obtaining a copy
 	of this software and associated documentation files (the "Software"), to deal

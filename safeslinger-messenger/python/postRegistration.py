@@ -210,6 +210,15 @@ class PostRegistration(webapp.RequestHandler):
             logging.error(msg)
 
 def main():
+    STR_VERSERVER = '01060000'
+    CURRENT_VERSION_ID = os.environ.get('CURRENT_VERSION_ID', STR_VERSERVER)
+    isProd = CURRENT_VERSION_ID[8:9] == 'p'
+    # Set the logging level in the main function
+    if isProd:
+        logging.getLogger().setLevel(logging.INFO)
+    else:
+        logging.getLogger().setLevel(logging.DEBUG)
+
     application = webapp.WSGIApplication([('/postRegistration', PostRegistration)],
                                          debug=True)
     util.run_wsgi_app(application)

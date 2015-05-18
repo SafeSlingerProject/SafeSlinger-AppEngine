@@ -77,7 +77,7 @@ class CleanUp(webapp.RequestHandler):
                             rquery.filter('registration_id =', f.sender_token)
                             reg = rquery.get()  # only want the latest
                             if (reg is not None) and (reg.active):
-                                logging.info('Registration marked inactive: (%i)%s... k:%s...' % (reg.notify_type, reg.registration_id[0:10], reg.key_id[0:10]))
+                                logging.warn('Registration marked inactive: (%i)%s... k:%s...' % (reg.notify_type, reg.registration_id[0:10], reg.key_id[0:10]))
                                 reg.active = False
                                 reg.put()
                                 

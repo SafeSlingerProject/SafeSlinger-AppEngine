@@ -251,7 +251,7 @@ class APNsConnection(object):
             if self._ssl:
                 self._ssl.close()
             self.connection_alive = False
-            _logger.info(" %s APNS connection closed" % self.__class__.__name__)
+            _logger.debug(" %s APNS connection closed" % self.__class__.__name__)
 
     def _connection(self):
         if not self._ssl or not self.connection_alive:
@@ -536,10 +536,10 @@ class GatewayConnection(APNsConnection):
                         #self._make_sure_error_response_handler_worker_alive()
                         self.write(message)
                         self._sent_notifications.append(dict({'id': identifier, 'message': message}))
-                        _logger.info("send notification to APNS.")
+                        _logger.debug("send notification to APNS.")
                         
                         rlist, _, _ = select.select([self._connection()], [], [], WAIT_READ_TIMEOUT_SEC)
-                        _logger.info("got response from APNS: %d" % len(rlist))
+                        _logger.debug("got response from APNS: %d" % len(rlist))
                         if len(rlist) > 0: # there's some data from APNs
                             self._socket.settimeout(0.5)
                             buff = self.read(ERROR_RESPONSE_LENGTH)
@@ -624,12 +624,12 @@ class GatewayConnection(APNsConnection):
 #                 
 #                 try:
 #                     self._apns_connection._socket.settimeout(0.5)
-#                     _logger.info("prepare receicing responses from APNS:")
+#                     _logger.debug("prepare receicing responses from APNS:")
 #                     buff = self._apns_connection.read(ERROR_RESPONSE_LENGTH)
 #                     _logger.info("got error-response from APNS:")
 #                     if len(buff) == ERROR_RESPONSE_LENGTH:
 #                         command, status, identifier = unpack(ERROR_RESPONSE_FORMAT, buff)
-#                         _logger.info("got response from APNS, code = %d, status = %d" % (command, status))
+#                         _logger.debug("got response from APNS, code = %d, status = %d" % (command, status))
 #                         if 8 == command: # there is error response from APNS
 #                             error_response = (status, identifier)
 #                             _logger.info("got error-response from APNS:" + str(error_response))
@@ -639,10 +639,10 @@ class GatewayConnection(APNsConnection):
 #                         self._disconnect()
 #                     
 #                     # rlist, _, _ = select.select([self._apns_connection._connection()], [], [], WAIT_READ_TIMEOUT_SEC)
-# #                     _logger.info("got response from APNS: %d" % len(rlist))
+# #                     _logger.debug("got response from APNS: %d" % len(rlist))
 # #                     if len(rlist) > 0: # there's some data from APNs
 # #                         with self._apns_connection._send_lock:
-# #                             _logger.info("got response from APNS")
+# #                             _logger.debug("got response from APNS")
 # #                             buff = self._apns_connection.read(ERROR_RESPONSE_LENGTH)
 # #                             if len(buff) == ERROR_RESPONSE_LENGTH:
 # #                                 command, status, identifier = unpack(ERROR_RESPONSE_FORMAT, buff)

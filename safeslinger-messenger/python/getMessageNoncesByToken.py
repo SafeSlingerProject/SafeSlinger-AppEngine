@@ -122,7 +122,7 @@ class GetMessageNoncesByToken(webapp.RequestHandler):
             self.response.out.write('%s' % struct.pack('!i', num))
             idx = 0
             for nonce in nonceArray:
-                # logging.info("nonce: " + nonce)
+                # logging.debug("nonce: " + nonce)
                 self.response.out.write('%s%s' % (struct.pack('!i', lenArray[idx]), nonce))
                 idx = idx + 1
     
@@ -134,6 +134,15 @@ class GetMessageNoncesByToken(webapp.RequestHandler):
             logging.error(msg)
 
 def main():
+    STR_VERSERVER = '01060000'
+    CURRENT_VERSION_ID = os.environ.get('CURRENT_VERSION_ID', STR_VERSERVER)
+    isProd = CURRENT_VERSION_ID[8:9] == 'p'
+    # Set the logging level in the main function
+    if isProd:
+        logging.getLogger().setLevel(logging.INFO)
+    else:
+        logging.getLogger().setLevel(logging.DEBUG)
+
     application = webapp.WSGIApplication([('/getMessageNoncesByToken', GetMessageNoncesByToken)],
                                          debug=True)
     util.run_wsgi_app(application)

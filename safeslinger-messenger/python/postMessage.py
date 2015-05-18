@@ -269,8 +269,8 @@ class PostMessage(webapp.RequestHandler):
                 APNS_CERT = credential.apnsCert
                 num = num + 1
             
-            logging.info("retrievalId: " + retrievalId)
-            logging.info("recipientToken: " + recipientToken)
+            logging.debug("retrievalId: " + retrievalId)
+            logging.debug("recipientToken: " + recipientToken)
             
             apns = None
             if isProd:
@@ -315,14 +315,12 @@ class PostMessage(webapp.RequestHandler):
                 self.resp_simple(0, 'Error=PushNotificationFail')
                 return
             
-            # TODO is it too risky to make these inactive given how easy it is to swap prod/test servers during development?    
-#             # if push service shows unregistered device, save the status
-#             # only do this for production devices to avoid conflicts during testing
-#             if status == 8 and isProd:
-#                 if reg_new is not None:
-#                     # update registration entry with canonical id
-#                     reg_new.active = False
-#                     reg_new.put()
+            # if push service shows unregistered device, save the status.
+            # if test/prod clients are not in sync with test/prod servers, they will be set inactive
+            if status == 8:
+                if reg_new is not None:
+                    reg_new.active = False
+                    reg_new.put()
                     
             # received status from SSL socket, handle appropriately
             if status == 0:
@@ -446,6 +444,15 @@ class PostMessage(webapp.RequestHandler):
             logging.error(msg)
 
 def main():
+    STR_VERSERVER = '01060000'
+    CURRENT_VERSION_ID = os.environ.get('CURRENT_VERSION_ID', STR_VERSERVER)
+    isProd = CURRENT_VERSION_ID[8:9] == 'p'
+    # Set the logging level in the main function
+    if isProd:
+        logging.getLogger().setLevel(logging.INFO)
+    else:
+        logging.getLogger().setLevel(logging.DEBUG)
+
     application = webapp.WSGIApplication([('/postMessage', PostMessage),
                                           ('/postFile1', PostMessage),
                                           ('/postFile2', PostMessage)],

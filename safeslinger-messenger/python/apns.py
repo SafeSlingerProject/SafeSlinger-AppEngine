@@ -249,7 +249,7 @@ class APNsConnection(object):
             if self._ssl:
                 self._ssl.close()
             self.connection_alive = False
-            _logger.info(" %s APNS connection closed" % self.__class__.__name__)
+            _logger.debug(" %s APNS connection closed" % self.__class__.__name__)
 
     def _connection(self):
         if not self._ssl or not self.connection_alive:
@@ -532,7 +532,7 @@ class GatewayConnection(APNsConnection):
                                     _logger.info("got error-response from APNS: %d" % status)
                                 _error = status
                         else:
-                            _logger.info("Successfully Sent Notification to APNS.") #DEBUG
+                            _logger.debug("Successfully Sent Notification to APNS.") #DEBUG
                         self._disconnect()
                     break
                 except socket_error as e:

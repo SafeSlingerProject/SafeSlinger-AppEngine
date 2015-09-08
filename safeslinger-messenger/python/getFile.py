@@ -25,10 +25,10 @@ import logging
 import os
 import struct
 
-from google.appengine.api import files
 from google.appengine.ext import webapp
 from google.appengine.ext.webapp import util
 
+import cloudstorage as gcs
 import filestorage
 
 
@@ -98,10 +98,10 @@ class GetFile(webapp.RequestHandler):
         num = 0
         for filestore in items:
 
-            blob_key = filestore.blobkey
-            if blob_key:
+            filename = filestore.blobkey
+            if filename:
                 # Open the file for reading
-                f = files.open("/blobstore/%s" % blob_key, "r")
+                f = gcs.open(filename, "r")
                 # Read data and close file
                 fileData = ''
                 newdata = f.read(65536)
@@ -109,6 +109,7 @@ class GetFile(webapp.RequestHandler):
                     fileData += newdata
                     newdata = f.read(65536)                
                 f.close()
+
             else:
                 fileData = filestore.data
 
@@ -124,7 +125,7 @@ class GetFile(webapp.RequestHandler):
             self.resp_simple(0, 'Error=MessageNotFound')
             return
     
-
+    
     def resp_simple(self, code, msg):
         self.response.out.write('%s%s' % (struct.pack('!i', code), msg))
         if code == 0:

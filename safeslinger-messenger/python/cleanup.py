@@ -23,10 +23,12 @@
 import datetime
 import logging
 
-from google.appengine.ext import blobstore, db, webapp
+from google.appengine.ext import db
+from google.appengine.ext import webapp
 from google.appengine.ext.webapp import util
 
 import c2dmAuthToken
+import cloudstorage as gcs
 import filestorage
 import registration
 
@@ -53,10 +55,10 @@ class CleanUp(webapp.RequestHandler):
             for f in fquery:
                 # remove downloaded after TIMEOUT_DOWN, or failed pushes, and the rest after TIMEOUT_PEND
                 if (f.downloaded) or (not f.push_accepted) or (f.inserted < pendlastDate):
-                    blob_key = f.blobkey
+                    filename = f.blobkey
                     # delete blobstore item if exists
-                    if blob_key:
-                        blobstore.delete(f.blobkey)
+                    if filename:
+                        gcs.delete(filename)
                     # delete datastore item
                     files.append(f)
                     
@@ -105,6 +107,7 @@ class CleanUp(webapp.RequestHandler):
             db.delete(tokens)
             if tokens.__len__() > 0:
                 logging.info('cleanup: old tokens=%i' % (tokens.__len__()))
+
 
 def main():
     application = webapp.WSGIApplication([('/cron/cleanup', CleanUp)],

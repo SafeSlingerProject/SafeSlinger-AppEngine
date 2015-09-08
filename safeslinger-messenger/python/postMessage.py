@@ -31,8 +31,9 @@ import random
 import struct
 import time
 import urllib, urllib2
+import uuid
 
-from google.appengine.api import files
+from google.appengine.api import app_identity
 from google.appengine.ext import webapp
 from google.appengine.ext.webapp import util
 from google.appengine.runtime import DeadlineExceededError
@@ -41,6 +42,7 @@ from apns import APNs, Payload, PayloadAlert
 import apnsAuthToken
 import c2dm
 import c2dmAuthToken
+import cloudstorage as gcs
 import filestorage
 import gcmAuthToken
 import registration
@@ -150,6 +152,9 @@ class PostMessage(webapp.RequestHandler):
                 active_reg = reg_new.active
     
         # otherwise, just use the submitted registration as is
+        
+        logging.debug("retrievalId: " + retrievalId)
+        logging.debug("recipientToken: " + recipientToken)            
 
         # NOT IMPLEMENTED PUSH TYPES ===============================================================================
         if devtype <= 0:
@@ -168,9 +173,11 @@ class PostMessage(webapp.RequestHandler):
                 filestore = filestorage.FileStorage(id=retrievalId, data=fileData, msg=msgData, client_ver=client, sender_token=str(recipientToken), notify_type=devtype)
             else:
                 # Create the file
-                blobName = files.blobstore.create(mime_type='application/octet-stream')        
+                bucket_name = app_identity.get_default_gcs_bucket_name()
+                object_name = str(uuid.uuid4())
+                filename = '/' + bucket_name + '/' + object_name
                 # Open the file and write to it
-                with files.open(blobName, 'a') as f:
+                with gcs.open(filename, 'w') as f:
                     pos = 0
                     bdata = str(fileData[pos:(pos + 65536)])
                     pos = pos + 65536
@@ -179,12 +186,11 @@ class PostMessage(webapp.RequestHandler):
                         bdata = str(fileData[pos:(pos + 65536)])
                         pos = pos + 65536
                 # Finalize the file. Do this before attempting to read it.
-                files.finalize(blobName)        
-                # Get the file's blob key
-                blob_key = str(files.blobstore.get_blob_key(blobName)) 
+                f.close()
+
                 # This will only work if the file is less than 10MB. Otherwise, we send a 
                 # correctly encoded multipart form and use the regular blobstore upload method. 
-                filestore = filestorage.FileStorage(id=retrievalId, blobkey=blob_key, msg=msgData, client_ver=client, sender_token=str(recipientToken), notify_type=devtype)
+                filestore = filestorage.FileStorage(id=retrievalId, blobkey=filename, msg=msgData, client_ver=client, sender_token=str(recipientToken), notify_type=devtype)
         else:
             filestore = filestorage.FileStorage(id=retrievalId, msg=msgData, client_ver=client, sender_token=str(recipientToken), notify_type=devtype)
         
@@ -268,9 +274,6 @@ class PostMessage(webapp.RequestHandler):
                 APNS_KEY = credential.apnsKey
                 APNS_CERT = credential.apnsCert
                 num = num + 1
-            
-            logging.debug("retrievalId: " + retrievalId)
-            logging.debug("recipientToken: " + recipientToken)
             
             apns = None
             if isProd:
@@ -426,12 +429,6 @@ class PostMessage(webapp.RequestHandler):
         # mark push complete to differentiate between inserted data, but failed push
         filestore.push_accepted = True
         filestore.put()        
-
-        # inactive registrations should be warned that the message may not arrive
-        # allow push message to attempt delivery, but still send error message back
-        if not active_reg:
-            self.resp_simple(0, 'Error=InvalidRegistration')
-            return
                         
         # file inserted and message sent
         self.response.out.write('%s' % struct.pack('!i', server))
@@ -442,6 +439,7 @@ class PostMessage(webapp.RequestHandler):
         self.response.out.write('%s%s' % (struct.pack('!i', code), msg))
         if code == 0:
             logging.error(msg)
+
 
 def main():
     STR_VERSERVER = '01060000'

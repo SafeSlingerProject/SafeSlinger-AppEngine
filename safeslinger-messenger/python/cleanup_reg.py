@@ -36,7 +36,7 @@ class CleanUpReg(webapp.RequestHandler):
         if self.request.headers.get('X-AppEngine-Cron') == 'true':
     
             query = registration.Registration.all().order('key_id').order('-inserted')
-            num = query.count()
+            num = 0
             dup_regs = []
             keys = set()
     
@@ -45,6 +45,7 @@ class CleanUpReg(webapp.RequestHandler):
             lastKeyId = None
             lastRegId = None
             for r in query:
+                num += 1
                 keys.add(r.key_id)
                 if r.registration_id == lastRegId:
                     if r.key_id == lastKeyId:

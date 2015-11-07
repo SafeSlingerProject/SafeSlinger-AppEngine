@@ -99,23 +99,23 @@ class SyncKeyNodes(webapp.RequestHandler):
         
         expectedsize = 4 + 4
 
-        postKeyNodes = False
-        if size > expectedsize:
-            if self.isJson:
+        postSelf = False
+        if self.isJson:
+            if 'keynode_b64' in data_dict:
                 usridpost = int(data_dict['usridpost'], 10)
-            else:
-                usridpost = (struct.unpack("!i", data[8:12]))[0]
-            logging.debug("in usridpost %i" % usridpost)
-        
-            if self.isJson:
                 key_node = base64.decodestring(data_dict['keynode_b64'])
-            else:
+                postSelf = True
+        else:
+            if size > expectedsize:
+                usridpost = (struct.unpack("!i", data[8:12]))[0]
                 sizeData = (struct.unpack("!i", data[12:16]))[0]
                 logging.debug("in sizeData %i" % sizeData)
                 key_node = (struct.unpack(str(sizeData) + "s", data[16:16 + sizeData]))[0]            
+                postSelf = True
+        if postSelf:
+            logging.debug("in usridpost %i" % usridpost)
             logging.debug("in key_node '%s'" % key_node)
-            postKeyNodes = True
- 
+                   
         # client version check
         if client < INT_VERCLIENT:
             self.resp_simple(0, ('Client version mismatch; %s required.  Download latest client release first.' % STR_VERCLIENT))
@@ -131,7 +131,7 @@ class SyncKeyNodes(webapp.RequestHandler):
             mem = query.get()
             
             # verify...
-            if postKeyNodes:
+            if postSelf:
                 query = member.Member.all()
                 query.filter('usr_id =', usridpost)
                 num = query.count()

@@ -32,6 +32,10 @@ handlers:
 - url: /cron/cleanup
   script: cleanup.py
 
+- url: /favicon\.ico
+  static_files: static/images/favicon.ico
+  upload: static/images/favicon\.ico
+  
 - url: /.*
   script: main.py
   secure: always

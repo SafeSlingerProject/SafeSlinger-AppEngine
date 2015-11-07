@@ -97,6 +97,7 @@ class AssignUser(webapp.RequestHandler):
         else:
             commit = data[4:]
         logging.debug("in commitment '%s'" % commit)
+        logging.debug("in commitment len '%s'" % commit.__sizeof__())
  
         # client version check
         if client < INT_VERCLIENT:
